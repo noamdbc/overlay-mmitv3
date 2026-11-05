@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Régie Overlay — Contrôle</title>
+  <link rel="stylesheet" href="/vendor/quicksand/300.css">
+  <link rel="stylesheet" href="/vendor/quicksand/400.css">
+  <link rel="stylesheet" href="/vendor/quicksand/500.css">
+  <link rel="stylesheet" href="/vendor/quicksand/600.css">
+  <link rel="stylesheet" href="/vendor/quicksand/700.css">
+  <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="/shared/overlay-render.css">
+  <link rel="stylesheet" href="/control.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- TOP BROADCAST BAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-mark">
+          <span class="brand-dot"></span>
+          <span class="brand-title">OVERLAY RÉGIE</span>
+        </div>
+
+        <div id="airBadge" class="air-badge is-idle">
+          <span class="air-led"></span>
+          <span id="airStatusText">HORS ANTENNE</span>
+        </div>
+
+        <div id="airTimerWrap" class="air-timer-wrap hidden">
+          <div class="air-timer-bar">
+            <div id="airTimerFill" class="air-timer-fill"></div>
+          </div>
+          <span id="airTimerValue" class="air-timer-val">0.0s</span>
+          <button id="btnHoldAir" class="btn-micro" title="Maintenir à l'antenne (passer en manuel)">
+            <i class="fa-solid fa-lock"></i> Maintenir
+          </button>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="net-pill" id="btnCopyOverlayUrl" title="Copier l'URL de l'overlay pour vMix">
+          <span id="overlayConnDot" class="conn-dot" title="Clients overlay connectés"></span>
+          <span id="overlayCountLabel">0 vMix</span>
+          <span class="net-sep"></span>
+          <i class="fa-solid fa-link"></i>
+          <code id="lanUrlText">localhost:3000/overlay</code>
+          <i class="fa-regular fa-copy copy-ico"></i>
+        </div>
+
+        <a href="/overlay" target="_blank" rel="noopener" class="btn-icon" title="Ouvrir l'overlay 1920x1080">
+          <i class="fa-solid fa-up-right-from-square"></i>
+        </a>
+
+        <button id="btnExport" class="btn-icon" title="Exporter JSON">
+          <i class="fa-solid fa-download"></i>
+        </button>
+
+        <button id="btnImport" class="btn-icon" title="Importer JSON">
+          <i class="fa-solid fa-upload"></i>
+        </button>
+        <input type="file" id="fileImport" accept=".json" class="hidden">
+      </div>
+    </header>
+
+    <!-- MAIN 3-COLUMN WORKSPACE -->
+    <main class="workspace">
+      <!-- LEFT: UNIFIED ASSETS LIBRARY / RUNDOWN -->
+      <aside class="panel panel-assets">
+        <div class="panel-head">
+          <div class="filter-tabs" role="tablist">
+            <button class="filter-tab active" data-filter="all">Tous</button>
+            <button class="filter-tab" data-filter="synthe">Synthés</button>
+            <button class="filter-tab" data-filter="titre">Titres</button>
+          </div>
+          <div class="create-btns">
+            <button id="btnNewSynthe" class="btn-add" title="Nouveau Synthé (Bas-Gauche)">
+              <i class="fa-solid fa-plus"></i> Synthé
+            </button>
+            <button id="btnNewTitre" class="btn-add btn-add-alt" title="Nouveau Titre (Bas-Centre)">
+              <i class="fa-solid fa-plus"></i> Titre
+            </button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" placeholder="Filtrer..." autocomplete="off">
+          <button id="btnClearSearch" class="btn-clear-search hidden" title="Effacer">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div id="assetList" class="asset-list"></div>
+      </aside>
+
+      <!-- CENTER: DUAL 1920x1080 MONITORS (PVW + PGM) & TRANSPORT -->
+      <section class="panel-center">
+        <div class="monitors-grid">
+          <!-- PREVIEW (EDITOR) -->
+          <div class="monitor-card monitor-pvw">
+            <div class="monitor-bar">
+              <div class="monitor-title">
+                <span class="tag-pvw">PRÉPARATION</span>
+                <span id="dirtyIndicator" class="dirty-pill hidden">Non enregistré</span>
+              </div>
+              <div class="monitor-tools">
+                <button id="btnTestAnimIn" class="btn-tool" title="Jouer l'animation d'entrée dans l'aperçu">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Tester IN
+                </button>
+                <button id="btnTestAnimOut" class="btn-tool" title="Jouer l'animation de sortie dans l'aperçu">
+                  <i class="fa-solid fa-arrow-down"></i> OUT
+                </button>
+                <button id="btnToggleSafe" class="btn-tool active" title="Grille Safe Area TV">
+                  <i class="fa-solid fa-border-none"></i>
+                </button>
+                <button id="btnCycleBg" class="btn-tool" title="Fond de simulation (aperçu uniquement)">
+                  <i class="fa-solid fa-chess-board"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="pvwViewport" class="viewport-wrap">
+              <div id="pvwScaler" class="stage-scaler bg-checker">
+                <div id="pvwStage" class="ov-stage"></div>
+                <div id="safeGuides" class="safe-guides">
+                  <div class="safe-action"></div>
+                  <div class="safe-title"></div>
+                  <div class="safe-cross-v"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PROGRAM (ON-AIR) -->
+          <div class="monitor-card monitor-pgm">
+            <div class="monitor-bar">
+              <div class="monitor-title">
+                <span id="pgmTag" class="tag-pgm">ANTENNE</span>
+                <span id="pgmAssetLabel" class="pgm-label">—</span>
+              </div>
+              <div class="monitor-tools">
+                <span id="queuedBadge" class="queued-pill hidden">
+                  <i class="fa-solid fa-forward-step"></i> <span id="queuedLabel"></span>
+                </span>
+              </div>
+            </div>
+
+            <div id="pgmViewport" class="viewport-wrap">
+              <div id="pgmScaler" class="stage-scaler bg-dark-studio">
+                <div id="pgmStage" class="ov-stage"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MASTER ACTION / BROADCAST CONTROL BAR -->
+        <div class="transport-bar">
+          <div class="transport-main">
+            <button id="btnTake" class="btn-broadcast btn-take" title="Envoyer l'asset édité à l'antenne (Espace / Entrée)">
+              <i class="fa-solid fa-play"></i>
+              <span>ENVOYER EN DIRECT</span>
+            </button>
+
+            <div class="quick-take-modes">
+              <button id="btnTakeAuto" class="btn-mode-override" title="Forcer lancement en mode Automatique">
+                <i class="fa-solid fa-clock"></i> Auto
+              </button>
+              <button id="btnTakeManual" class="btn-mode-override" title="Forcer lancement en mode Manuel">
+                <i class="fa-solid fa-hand"></i> Manuel
+              </button>
+            </div>
+
+            <button id="btnOut" class="btn-broadcast btn-out" title="Animation de sortie (Échap)">
+              <i class="fa-solid fa-arrow-down-long"></i>
+              <span>SORTIR</span>
+            </button>
+
+            <button id="btnCut" class="btn-broadcast btn-cut" title="Coupure immédiate sans animation (Shift+Échap)">
+              <i class="fa-solid fa-bolt-lightning"></i>
+              <span>CUT</span>
+            </button>
+          </div>
+
+          <div class="transport-save">
+            <button id="btnScratch" class="btn-sec" title="Préparer un direct libre sans toucher aux assets enregistrés">
+              <i class="fa-solid fa-pen-to-square"></i> Direct libre
+            </button>
+            <button id="btnRevert" class="btn-sec hidden" title="Annuler les modifications non enregistrées">
+              <i class="fa-solid fa-rotate-left"></i> Annuler
+            </button>
+            <button id="btnDuplicate" class="btn-sec" title="Dupliquer cet asset (Ctrl+D)">
+              <i class="fa-regular fa-clone"></i> Dupliquer
+            </button>
+            <button id="btnSave" class="btn-sec btn-save" title="Enregistrer dans la liste (Ctrl+S)">
+              <i class="fa-solid fa-floppy-disk"></i> <span id="saveBtnLabel">Enregistrer</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: COMPLETE CUSTOMIZATION INSPECTOR -->
+      <aside class="panel panel-inspector">
+        <div class="inspector-tabs">
+          <button class="insp-tab active" data-tab="content">
+            <i class="fa-solid fa-pen"></i> Contenu
+          </button>
+          <button class="insp-tab" data-tab="style">
+            <i class="fa-solid fa-sliders"></i> Visuel
+          </button>
+          <button class="insp-tab" data-tab="typo">
+            <i class="fa-solid fa-font"></i> Typo & Motion
+          </button>
+        </div>
+
+        <div class="inspector-body">
+          <!-- TAB 1: CONTENT & TIMING -->
+          <div class="insp-pane active" id="tab-content">
+            <div class="field-group">
+              <label class="field-label">Catégorie / Placement rapide</label>
+              <div class="segmented-2">
+                <button type="button" class="seg-btn" data-kind-preset="synthe">
+                  <i class="fa-solid fa-id-badge"></i> Synthé (Bas-Gauche)
+                </button>
+                <button type="button" class="seg-btn" data-kind-preset="titre">
+                  <i class="fa-solid fa-closed-captioning"></i> Titre (Bas-Centre)
+                </button>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="inpPrimary">Texte principal</label>
+              <input type="text" id="inpPrimary" class="inp-text inp-lg" placeholder="Nom ou titre de séquence">
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="inpSecondary">Sous-titre / Fonction</label>
+              <input type="text" id="inpSecondary" class="inp-text" placeholder="Optionnel">
+            </div>
+
+            <div class="field-row-2">
+              <div class="field-group">
+                <label class="field-label" for="inpTag">Surtitre / Badge</label>
+                <input type="text" id="inpTag" class="inp-text" placeholder="Optionnel">
+              </div>
+
+              <div class="field-group">
+                <label class="field-label" for="inpIcon">Icône Font Awesome</label>
+                <div class="icon-input-wrap">
+                  <button type="button" id="btnIconPicker" class="btn-icon-preview" title="Choisir une icône">
+                    <i id="currentIconPreview" class="fa-solid fa-ban"></i>
+                  </button>
+                  <input type="text" id="inpIcon" class="inp-text" placeholder="fa-solid fa-user">
+                  <button type="button" id="btnClearIcon" class="btn-clear-inline" title="Sans icône">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div id="iconPickerDrawer" class="icon-picker-drawer hidden">
+              <div id="iconGrid" class="icon-grid"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field-group">
+              <label class="field-label">Mode de diffusion</label>
+              <div class="segmented-2">
+                <button type="button" class="seg-btn" data-mode="auto">
+                  <i class="fa-solid fa-stopwatch"></i> Automatique
+                </button>
+                <button type="button" class="seg-btn" data-mode="manual">
+                  <i class="fa-solid fa-hand"></i> Manuel
+                </button>
+              </div>
+            </div>
+
+            <div id="durationGroup" class="field-group">
+              <div class="slider-header">
+                <label class="field-label" for="rngDuration">Durée à l'antenne</label>
+                <div class="num-unit">
+                  <input type="number" id="numDuration" min="1" max="120" step="0.5" class="inp-num">
+                  <span>s</span>
+                </div>
+              </div>
+              <input type="range" id="rngDuration" min="1.5" max="20" step="0.5" class="inp-range">
+            </div>
+          </div>
+
+          <!-- TAB 2: STYLE, COLORS & GEOMETRY -->
+          <div class="insp-pane" id="tab-style">
+            <div class="field-group">
+              <label class="field-label">Rendu visuel</label>
+              <div class="layout-cards">
+                <button type="button" class="layout-btn" data-layout="layered">Décalé</button>
+                <button type="button" class="layout-btn" data-layout="split">Unifié</button>
+                <button type="button" class="layout-btn" data-layout="capsule">Capsule</button>
+                <button type="button" class="layout-btn" data-layout="minimal">Minimal</button>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Thèmes rapides (Charte)</label>
+              <div class="theme-presets" id="themePresets">
+                <button type="button" class="theme-chip" data-theme="light-gold" title="Blanc / Jaune / Anthracite">
+                  <span style="background:#FAB001"></span><span style="background:#FFFFFF"></span><span style="background:#000000"></span>
+                </button>
+                <button type="button" class="theme-chip" data-theme="grey-gold" title="Anthracite / Jaune / Blanc">
+                  <span style="background:#FAB001"></span><span style="background:#404040"></span><span style="background:#FFFFFF"></span>
+                </button>
+                <button type="button" class="theme-chip" data-theme="black-gold" title="Noir / Jaune / Blanc">
+                  <span style="background:#FAB001"></span><span style="background:#000000"></span><span style="background:#FFFFFF"></span>
+                </button>
+                <button type="button" class="theme-chip" data-theme="gold-black" title="Jaune / Noir / Blanc">
+                  <span style="background:#000000"></span><span style="background:#FAB001"></span><span style="background:#404040"></span>
+                </button>
+                <button type="button" class="theme-chip" data-theme="clean-white" title="Blanc / Anthracite">
+                  <span style="background:#404040"></span><span style="background:#FFFFFF"></span><span style="background:#FAB001"></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="colors-matrix" id="colorsMatrix">
+              <!-- Generated dynamically by control.js with instant brand swatches (#FAB001, #FFFFFF, #404040, #000000) -->
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field-group">
+              <label class="field-label">Alignement horizontal</label>
+              <div class="segmented-3">
+                <button type="button" class="seg-btn" data-align="left">
+                  <i class="fa-solid fa-align-left"></i> Gauche
+                </button>
+                <button type="button" class="seg-btn" data-align="center">
+                  <i class="fa-solid fa-align-center"></i> Centre
+                </button>
+                <button type="button" class="seg-btn" data-align="right">
+                  <i class="fa-solid fa-align-right"></i> Droite
+                </button>
+              </div>
+            </div>
+
+            <div class="sliders-stack">
+              <div class="slider-row">
+                <span class="slider-lbl">Position X</span>
+                <input type="range" id="rngPosX" min="-300" max="500" step="2" class="inp-range">
+                <input type="number" id="numPosX" min="-600" max="800" step="2" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Position Y</span>
+                <input type="range" id="rngPosY" min="0" max="320" step="2" class="inp-range">
+                <input type="number" id="numPosY" min="0" max="500" step="2" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Échelle</span>
+                <input type="range" id="rngScale" min="0.6" max="1.6" step="0.02" class="inp-range">
+                <input type="number" id="numScale" min="0.5" max="2" step="0.05" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Arrondis</span>
+                <input type="range" id="rngRadius" min="0" max="48" step="1" class="inp-range">
+                <input type="number" id="numRadius" min="0" max="100" step="1" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Marge int. X</span>
+                <input type="range" id="rngPadX" min="10" max="56" step="1" class="inp-range">
+                <input type="number" id="numPadX" min="8" max="64" step="1" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Marge int. Y</span>
+                <input type="range" id="rngPadY" min="4" max="32" step="1" class="inp-range">
+                <input type="number" id="numPadY" min="4" max="40" step="1" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Accent</span>
+                <input type="range" id="rngAccentW" min="0" max="20" step="1" class="inp-range">
+                <input type="number" id="numAccentW" min="0" max="24" step="1" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Bordure</span>
+                <input type="range" id="rngBorderW" min="0" max="6" step="1" class="inp-range">
+                <input type="number" id="numBorderW" min="0" max="8" step="1" class="inp-num">
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: TYPOGRAPHY (QUICKSAND) & MOTION DESIGN -->
+          <div class="insp-pane" id="tab-typo">
+            <div class="field-group">
+              <div class="flex-between">
+                <label class="field-label">Ligne principale (Quicksand)</label>
+                <label class="chk-pill">
+                  <input type="checkbox" id="chkPrimaryUpper">
+                  <span>MAJUSCULES</span>
+                </label>
+              </div>
+              <div class="weight-pills" data-weight-target="primaryWeight">
+                <button type="button" data-w="300" style="font-weight:300">300</button>
+                <button type="button" data-w="400" style="font-weight:400">400</button>
+                <button type="button" data-w="500" style="font-weight:500">500</button>
+                <button type="button" data-w="600" style="font-weight:600">600</button>
+                <button type="button" data-w="700" style="font-weight:700">700</button>
+              </div>
+              <div class="slider-row mt-8">
+                <span class="slider-lbl">Taille</span>
+                <input type="range" id="rngPrimarySize" min="16" max="60" step="1" class="inp-range">
+                <input type="number" id="numPrimarySize" min="14" max="72" step="1" class="inp-num">
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field-group">
+              <div class="flex-between">
+                <label class="field-label">Sous-titre (Quicksand)</label>
+                <label class="chk-pill">
+                  <input type="checkbox" id="chkSecondaryUpper">
+                  <span>MAJUSCULES</span>
+                </label>
+              </div>
+              <div class="weight-pills" data-weight-target="secondaryWeight">
+                <button type="button" data-w="300" style="font-weight:300">300</button>
+                <button type="button" data-w="400" style="font-weight:400">400</button>
+                <button type="button" data-w="500" style="font-weight:500">500</button>
+                <button type="button" data-w="600" style="font-weight:600">600</button>
+                <button type="button" data-w="700" style="font-weight:700">700</button>
+              </div>
+              <div class="slider-row mt-8">
+                <span class="slider-lbl">Taille</span>
+                <input type="range" id="rngSecondarySize" min="11" max="36" step="1" class="inp-range">
+                <input type="number" id="numSecondarySize" min="11" max="48" step="1" class="inp-num">
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field-group">
+              <label class="field-label">Animation (Motion Design)</label>
+              <div class="anim-cards">
+                <button type="button" class="anim-btn" data-anim="bouncy-rise">
+                  <i class="fa-solid fa-angles-up"></i>
+                  <span>Rebond Broadcast</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="elastic-wipe">
+                  <i class="fa-solid fa-arrows-left-right-to-line"></i>
+                  <span>Déploiement Élastique</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="spring-cascade">
+                  <i class="fa-solid fa-layer-group"></i>
+                  <span>Cascade Spring</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Cadence d'animation</label>
+              <div class="segmented-3">
+                <button type="button" class="seg-btn" data-speed="0.78">Vive</button>
+                <button type="button" class="seg-btn" data-speed="1">Normale</button>
+                <button type="button" class="seg-btn" data-speed="1.25">Souple</button>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field-group">
+              <label class="field-label">Propagation du style</label>
+              <div class="propagate-btns">
+                <button type="button" id="btnApplySameKind" class="btn-sec btn-block">
+                  <i class="fa-solid fa-swatchbook"></i> Appliquer aux assets de même catégorie
+                </button>
+                <button type="button" id="btnApplyAll" class="btn-sec btn-block">
+                  <i class="fa-solid fa-globe"></i> Appliquer à tous les assets
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/gsap/gsap.min.js"></script>
+  <script src="/shared/renderer.js"></script>
+  <script src="/control.js"></script>
+</body>
+</html>

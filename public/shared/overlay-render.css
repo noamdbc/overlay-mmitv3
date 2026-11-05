@@ -1,0 +1,325 @@
+/* ==========================================================================
+   Broadcast 1920x1080 Flat Overlay Renderer Styles
+   100% Flat (zero blur / zero drop-shadow) — Fill & Key Safe
+   ========================================================================== */
+
+.ov-stage {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
+  user-select: none;
+  font-family: 'Quicksand', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+.ov-anchor {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  max-width: 1560px;
+}
+
+.ov-anchor.align-left {
+  align-items: flex-start;
+}
+
+.ov-anchor.align-center {
+  left: 50%;
+  align-items: center;
+}
+
+.ov-anchor.align-right {
+  align-items: flex-end;
+}
+
+.ov-scale-box {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.ov-anchor.align-left .ov-scale-box {
+  transform-origin: left bottom;
+  align-items: flex-start;
+}
+
+.ov-anchor.align-center .ov-scale-box {
+  transform-origin: center bottom;
+  align-items: center;
+}
+
+.ov-anchor.align-right .ov-scale-box {
+  transform-origin: right bottom;
+  align-items: flex-end;
+}
+
+.ov-motion-rig {
+  display: inline-flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+.ov-anchor.align-left .ov-motion-rig {
+  align-items: flex-start;
+}
+
+.ov-anchor.align-center .ov-motion-rig {
+  align-items: center;
+}
+
+.ov-anchor.align-right .ov-motion-rig {
+  align-items: flex-end;
+}
+
+/* Text mask helper for crisp vertical kinetic typography */
+.ov-text-mask {
+  display: block;
+  overflow: hidden;
+  line-height: 1.18;
+}
+
+.ov-text-inner {
+  display: block;
+  will-change: transform;
+  white-space: nowrap;
+}
+
+/* Optional top tag / eyebrow */
+.ov-tag-wrap {
+  overflow: hidden;
+  margin-bottom: 5px;
+  z-index: 3;
+}
+
+.ov-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  will-change: transform;
+}
+
+/* ==========================================================================
+   LAYOUT 1: LAYERED (Décalé Flat — Signature Synthé)
+   ========================================================================== */
+.ov-layout-layered .ov-main-row {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 6px;
+  z-index: 2;
+}
+
+.ov-anchor.align-right .ov-layout-layered .ov-main-row {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-layered .ov-accent {
+  flex-shrink: 0;
+  will-change: transform;
+}
+
+.ov-layout-layered .ov-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  aspect-ratio: 1 / 1;
+  will-change: transform;
+}
+
+.ov-layout-layered .ov-primary-plate {
+  display: inline-flex;
+  align-items: center;
+  will-change: transform, clip-path;
+}
+
+.ov-layout-layered .ov-secondary-wrap {
+  overflow: hidden;
+  margin-top: 5px;
+  z-index: 1;
+}
+
+.ov-anchor.align-left .ov-layout-layered .ov-secondary-wrap {
+  margin-left: var(--sec-indent, 18px);
+}
+
+.ov-anchor.align-right .ov-layout-layered .ov-secondary-wrap {
+  margin-right: var(--sec-indent, 18px);
+}
+
+.ov-layout-layered .ov-secondary-plate {
+  display: inline-flex;
+  align-items: center;
+  will-change: transform, clip-path;
+}
+
+/* ==========================================================================
+   LAYOUT 2: SPLIT (Bloc Unifié Flat)
+   ========================================================================== */
+.ov-layout-split .ov-split-shell {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  will-change: transform, clip-path;
+}
+
+.ov-anchor.align-right .ov-layout-split .ov-split-shell {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-split .ov-accent {
+  flex-shrink: 0;
+  will-change: transform;
+}
+
+.ov-layout-split .ov-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0 22px;
+  will-change: transform;
+}
+
+.ov-layout-split .ov-split-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.ov-layout-split .ov-primary-plate {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ov-anchor.align-center .ov-layout-split .ov-primary-plate,
+.ov-anchor.align-center .ov-layout-split .ov-secondary-plate {
+  justify-content: center;
+}
+
+.ov-anchor.align-right .ov-layout-split .ov-primary-plate,
+.ov-anchor.align-right .ov-layout-split .ov-secondary-plate {
+  justify-content: flex-end;
+}
+
+.ov-layout-split .ov-secondary-plate {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  will-change: transform, clip-path;
+}
+
+/* ==========================================================================
+   LAYOUT 3: CAPSULE (Pilule Moderne Flat)
+   ========================================================================== */
+.ov-layout-capsule .ov-primary-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 2;
+  will-change: transform, clip-path;
+}
+
+.ov-anchor.align-right .ov-layout-capsule .ov-primary-plate {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-capsule .ov-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  will-change: transform;
+}
+
+.ov-layout-capsule .ov-secondary-wrap {
+  margin-top: 6px;
+  z-index: 1;
+}
+
+.ov-anchor.align-left .ov-layout-capsule .ov-secondary-wrap {
+  margin-left: 18px;
+}
+
+.ov-anchor.align-right .ov-layout-capsule .ov-secondary-wrap {
+  margin-right: 18px;
+}
+
+.ov-layout-capsule .ov-secondary-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  will-change: transform, clip-path;
+}
+
+.ov-layout-capsule .ov-accent-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
+/* ==========================================================================
+   LAYOUT 4: MINIMAL (Bandeau Discret — Idéal Titre de Séquence)
+   ========================================================================== */
+.ov-layout-minimal .ov-minimal-bar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  will-change: transform, clip-path;
+}
+
+.ov-anchor.align-right .ov-layout-minimal .ov-minimal-bar {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-minimal .ov-minimal-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ov-anchor.align-right .ov-layout-minimal .ov-minimal-inner {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-minimal .ov-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  will-change: transform;
+}
+
+.ov-layout-minimal .ov-secondary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  line-height: 1.15;
+  will-change: transform;
+}
+
+.ov-layout-minimal .ov-accent-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  will-change: transform;
+}
+
+.ov-layout-minimal .ov-accent-side {
+  align-self: stretch;
+  flex-shrink: 0;
+  will-change: transform;
+}

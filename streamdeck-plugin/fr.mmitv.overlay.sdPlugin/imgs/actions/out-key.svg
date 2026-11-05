@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 144 144">
+  <rect width="144" height="144" fill="#181818"/>
+  <path d="M72 34V82M72 82L52 62M72 82L92 62" stroke="#FAB001" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="44" y="92" width="56" height="7" rx="3.5" fill="#FAB001"/>
+  <text x="72" y="122" fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="700" text-anchor="middle">SORTIR</text>
+</svg>

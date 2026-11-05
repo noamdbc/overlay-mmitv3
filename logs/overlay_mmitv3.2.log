@@ -1,0 +1,12 @@
+2026-11-04T23:58:32.498Z ERROR Process encountered uncaught exception 
+Error: Failed to read manifest.json as the file does not exist.
+    at Lazy.<anonymous> (/Users/noam/Documents/MMI/webtv/overlay_mmitv3/streamdeck-plugin/fr.mmitv.overlay.sdPlugin/bin/plugin.cjs:20783:11)
+    at get value (/Users/noam/Documents/MMI/webtv/overlay_mmitv3/streamdeck-plugin/fr.mmitv.overlay.sdPlugin/bin/plugin.cjs:9294:39)
+    at getManifest (/Users/noam/Documents/MMI/webtv/overlay_mmitv3/streamdeck-plugin/fr.mmitv.overlay.sdPlugin/bin/plugin.cjs:20808:19)
+    at Lazy.<anonymous> (/Users/noam/Documents/MMI/webtv/overlay_mmitv3/streamdeck-plugin/fr.mmitv.overlay.sdPlugin/bin/plugin.cjs:21801:32)
+    at get value (/Users/noam/Documents/MMI/webtv/overlay_mmitv3/streamdeck-plugin/fr.mmitv.overlay.sdPlugin/bin/plugin.cjs:9294:39)
+    at ActionService.registerAction (/Users/noam/Documents/MMI/webtv/overlay_mmitv3/streamdeck-plugin/fr.mmitv.overlay.sdPlugin/bin/plugin.cjs:21981:19)
+    at Object.<anonymous> (/Users/noam/Documents/MMI/webtv/overlay_mmitv3/streamdeck-plugin/fr.mmitv.overlay.sdPlugin/bin/plugin.cjs:26554:24)
+    at Module._compile (node:internal/modules/cjs/loader:1830:14)
+    at Object..js (node:internal/modules/cjs/loader:1961:10)
+    at Module.load (node:internal/modules/cjs/loader:1553:32)

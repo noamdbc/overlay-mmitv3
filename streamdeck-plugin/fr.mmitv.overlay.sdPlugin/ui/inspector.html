@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuration Overlay Régie</title>
+  <link rel="stylesheet" href="inspector.css">
+</head>
+<body>
+  <div class="pi-wrap">
+    <!-- Server Connection Block -->
+    <div class="card">
+      <div class="row-between">
+        <div class="status-pill">
+          <span id="connDot" class="dot"></span>
+          <span id="connText">Connexion...</span>
+        </div>
+        <button type="button" id="btnToggleServer" class="btn-link">Serveur</button>
+      </div>
+
+      <div id="serverBox" class="server-box hidden">
+        <label class="lbl" for="inpServerUrl">URL du serveur Node</label>
+        <div class="url-row">
+          <input type="text" id="inpServerUrl" class="inp" placeholder="http://localhost:3000">
+          <button type="button" id="btnSaveServer" class="btn-primary">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Asset Picker Section (only shown for fr.mmitv.overlay.asset) -->
+    <div id="assetSection" class="section hidden">
+      <div class="filter-row">
+        <div class="tabs">
+          <button type="button" class="tab active" data-filter="all">Tous</button>
+          <button type="button" class="tab" data-filter="synthe">Synthés</button>
+          <button type="button" class="tab" data-filter="titre">Titres</button>
+        </div>
+        <input type="text" id="inpSearch" class="inp inp-search" placeholder="Rechercher...">
+      </div>
+
+      <div id="assetList" class="asset-list"></div>
+
+      <div class="card">
+        <label class="lbl" for="inpCustomLabel">Titre sur le bouton (vide = auto)</label>
+        <div class="url-row">
+          <input type="text" id="inpCustomLabel" class="inp" placeholder="Automatique">
+          <button type="button" id="btnClearLabel" class="btn-ghost" title="Réinitialiser">×</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compact Info for Transport Actions (SORTIR / CUT / MAINTENIR) -->
+    <div id="transportSection" class="card hidden">
+      <div id="transportDesc" class="transport-desc"></div>
+    </div>
+  </div>
+
+  <script src="inspector.js"></script>
+</body>
+</html>

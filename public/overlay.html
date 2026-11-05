@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0">
+  <title>Overlay 1920x1080</title>
+  <link rel="stylesheet" href="/vendor/quicksand/300.css">
+  <link rel="stylesheet" href="/vendor/quicksand/400.css">
+  <link rel="stylesheet" href="/vendor/quicksand/500.css">
+  <link rel="stylesheet" href="/vendor/quicksand/600.css">
+  <link rel="stylesheet" href="/vendor/quicksand/700.css">
+  <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="/shared/overlay-render.css">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent !important;
+      background-color: rgba(0, 0, 0, 0) !important;
+    }
+    html.key-matte, html.key-matte body {
+      background: #000000 !important;
+      background-color: #000000 !important;
+    }
+    html.key-matte #stage {
+      filter: brightness(0) invert(1);
+    }
+    /* Hidden font preloader so all Quicksand weights are rasterized before first TAKE */
+    .font-preload {
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      opacity: 0;
+      pointer-events: none;
+      font-family: 'Quicksand', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="font-preload" aria-hidden="true">
+    <span style="font-weight:300">MMI</span>
+    <span style="font-weight:400">MMI</span>
+    <span style="font-weight:500">MMI</span>
+    <span style="font-weight:600">MMI</span>
+    <span style="font-weight:700">MMI</span>
+  </div>
+
+  <div id="stage" class="ov-stage"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/gsap/gsap.min.js"></script>
+  <script src="/shared/renderer.js"></script>
+  <script src="/overlay.js"></script>
+</body>
+</html>

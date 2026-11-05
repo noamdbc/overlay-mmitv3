@@ -1,0 +1,21 @@
+{
+  "name": "overlay-mmitv3",
+  "version": "1.0.0",
+  "description": "Système d'overlay broadcast Web & LAN (Synthés & Titres) — vMix / Fill & Key",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build:streamdeck": "npm --prefix streamdeck-plugin run build"
+  },
+  "dependencies": {
+    "@fontsource/quicksand": "^5.2.8",
+    "@fortawesome/fontawesome-free": "^7.2.0",
+    "express": "^5.2.1",
+    "gsap": "^3.14.2",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
+  }
+}

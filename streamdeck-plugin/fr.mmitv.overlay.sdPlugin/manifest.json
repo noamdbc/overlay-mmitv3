@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Name": "Overlay Régie",
+  "UUID": "fr.mmitv.overlay",
+  "Version": "1.0.0.0",
+  "Author": "MMI TV",
+  "Description": "Pilotage en direct des synthés et titres d'overlay en régie.",
+  "Category": "Overlay Régie",
+  "CategoryIcon": "imgs/plugin/category",
+  "Icon": "imgs/plugin/icon",
+  "CodePath": "bin/plugin.cjs",
+  "PropertyInspectorPath": "ui/inspector.html",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.4"
+  },
+  "Nodejs": {
+    "Version": "20"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "12"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Actions": [
+    {
+      "Name": "Asset (Synthé / Titre)",
+      "UUID": "fr.mmitv.overlay.asset",
+      "Icon": "imgs/actions/asset",
+      "Tooltip": "Déclenche un synthé ou titre (clic court : auto/toggle, clic long : manuel)",
+      "Controllers": [
+        "Keypad"
+      ],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/asset-key",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "SORTIR (Animation)",
+      "UUID": "fr.mmitv.overlay.out",
+      "Icon": "imgs/actions/out",
+      "Tooltip": "Lance l'animation de disparition de l'asset actif",
+      "Controllers": [
+        "Keypad"
+      ],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/out-key",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "CUT (Immédiat)",
+      "UUID": "fr.mmitv.overlay.cut",
+      "Icon": "imgs/actions/cut",
+      "Tooltip": "Coupe instantanément tout overlay à l'écran",
+      "Controllers": [
+        "Keypad"
+      ],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/cut-key",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "MAINTENIR (Bloquer Auto)",
+      "UUID": "fr.mmitv.overlay.hold",
+      "Icon": "imgs/actions/hold",
+      "Tooltip": "Bloque le décompte automatique et maintient l'asset à l'antenne en manuel",
+      "Controllers": [
+        "Keypad"
+      ],
+      "UserTitleEnabled": false,
+      "States": [
+        {
+          "Image": "imgs/actions/hold-key",
+          "ShowTitle": false
+        }
+      ]
+    }
+  ]
+}

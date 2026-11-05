@@ -1,0 +1,18 @@
+{
+  "name": "overlay-mmitv3-streamdeck",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "validate": "streamdeck validate fr.mmitv.overlay.sdPlugin"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "^3.0.4",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "@elgato/cli": "^1.7.0",
+    "esbuild": "^0.27.3"
+  }
+}
