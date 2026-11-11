@@ -38,6 +38,8 @@ streamDeck.ui.onSendToPlugin(async (ev) => {
     await streamDeck.settings.setGlobalSettings({ serverUrl: cleanUrl });
     bridge.connect(cleanUrl);
     pushStateToInspector();
+  } else if (payload.cmd === 'switchProfile') {
+    bridge.switchProfile(payload.profileId);
   }
 });
 

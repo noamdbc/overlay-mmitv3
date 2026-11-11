@@ -1,4 +1,5 @@
 node_modules/
+/dist/
 streamdeck-plugin/node_modules/
 streamdeck-plugin/fr.mmitv.overlay.sdPlugin/logs/
 data/*.tmp

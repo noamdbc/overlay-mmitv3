@@ -1,12 +1,12 @@
 :root {
   --yellow: #FAB001;
-  --bg: #2D2D2D;
-  --card: #222222;
-  --card-hover: #333333;
-  --input: #171717;
-  --border: #3D3D3D;
-  --txt: #F2F2F2;
-  --muted: #9E9E9E;
+  --bg: #262830;
+  --card: #1B1D24;
+  --card-hover: #252934;
+  --input: #12141A;
+  --border: #343946;
+  --txt: #F4F6FA;
+  --muted: #9BA3B5;
   --ok: #25C26E;
 }
 
@@ -44,8 +44,8 @@ body {
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 9px 10px;
+  border-radius: 8px;
+  padding: 10px 11px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -61,7 +61,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 12px;
 }
 
@@ -69,27 +69,63 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #777777;
+  background: #FF5C5C;
 }
 
 .dot.online {
   background: var(--ok);
+  box-shadow: 0 0 6px rgba(37, 194, 110, 0.7);
+}
+
+.dot.mismatch {
+  background: #EF233C;
+  box-shadow: 0 0 6px rgba(239, 35, 60, 0.8);
+}
+
+.mismatch-box {
+  background: #3B0A10;
+  border: 1px solid #EF233C;
+  border-radius: 6px;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #FFD6DA;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.mismatch-box strong {
+  color: #FAB001;
+}
+
+.mismatch-sub {
+  font-size: 10.5px;
+  color: #FFA8B2;
 }
 
 .btn-link {
-  background: #333333;
+  background: #2B303C;
   border: 1px solid var(--border);
   color: var(--txt);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 3px 9px;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
 }
 
 .btn-link:hover {
   border-color: var(--yellow);
   color: var(--yellow);
+}
+
+.profile-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
 }
 
 .server-box {
@@ -102,7 +138,7 @@ body {
 
 .lbl {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
 }
 
@@ -113,13 +149,14 @@ body {
 
 .inp {
   flex: 1;
-  height: 29px;
+  height: 30px;
   padding: 0 8px;
   border-radius: 5px;
   border: 1px solid var(--border);
   background: var(--input);
   color: var(--txt);
   font-size: 12px;
+  font-weight: 600;
   outline: none;
 }
 
@@ -127,21 +164,64 @@ body {
   border-color: var(--yellow);
 }
 
+/* Live Stream Deck Hardware Key Preview */
+.key-preview-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+}
+
+.key-lcd-bezel {
+  width: 68px;
+  height: 68px;
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 14px;
+  background: #0C0E12;
+  border: 2px solid #3A4050;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8), 0 3px 8px rgba(0, 0, 0, 0.45);
+}
+
+.key-lcd-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #141720;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+
+.key-preview-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.key-hint {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
 .btn-primary {
-  height: 29px;
+  height: 30px;
   padding: 0 12px;
   border-radius: 5px;
   border: none;
   background: var(--yellow);
   color: #000000;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 12px;
   cursor: pointer;
 }
 
 .btn-ghost {
-  width: 29px;
-  height: 29px;
+  width: 30px;
+  height: 30px;
   border-radius: 5px;
   border: 1px solid var(--border);
   background: var(--input);
@@ -171,7 +251,7 @@ body {
 }
 
 .tab {
-  height: 25px;
+  height: 26px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -182,8 +262,8 @@ body {
 }
 
 .tab.active {
-  background: #404040;
-  color: #FFFFFF;
+  background: var(--yellow);
+  color: #000000;
 }
 
 .inp-search {
@@ -191,7 +271,7 @@ body {
 }
 
 .asset-list {
-  max-height: 230px;
+  max-height: 240px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -203,13 +283,14 @@ body {
   position: relative;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 7px 9px 7px 13px;
+  border-radius: 7px;
+  padding: 8px 9px 8px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
 }
 
 .asset-card:hover {
@@ -218,7 +299,7 @@ body {
 
 .asset-card.selected {
   border-color: var(--yellow);
-  background: #2C2716;
+  background: #2A2516;
 }
 
 .swatch {
@@ -226,8 +307,8 @@ body {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 5px;
-  border-radius: 5px 0 0 5px;
+  width: 6px;
+  border-radius: 6px 0 0 6px;
 }
 
 .asset-meta {
@@ -257,7 +338,7 @@ body {
 .badge {
   flex-shrink: 0;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   padding: 2px 6px;
   border-radius: 4px;
   background: #141414;
@@ -266,8 +347,8 @@ body {
 }
 
 .badge.auto {
-  background: rgba(250, 176, 1, 0.16);
-  border-color: rgba(250, 176, 1, 0.45);
+  background: rgba(250, 176, 1, 0.18);
+  border-color: rgba(250, 176, 1, 0.5);
   color: var(--yellow);
 }
 

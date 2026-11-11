@@ -4,11 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Régie Overlay — Contrôle</title>
-  <link rel="stylesheet" href="/vendor/quicksand/300.css">
-  <link rel="stylesheet" href="/vendor/quicksand/400.css">
-  <link rel="stylesheet" href="/vendor/quicksand/500.css">
-  <link rel="stylesheet" href="/vendor/quicksand/600.css">
-  <link rel="stylesheet" href="/vendor/quicksand/700.css">
+  <link rel="stylesheet" href="/vendor/fonts/all-fonts.css">
   <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
   <link rel="stylesheet" href="/shared/overlay-render.css">
   <link rel="stylesheet" href="/control.css">
@@ -21,6 +17,7 @@
         <div class="brand-mark">
           <span class="brand-dot"></span>
           <span class="brand-title">OVERLAY RÉGIE</span>
+          <span id="topVersionBadge" class="ver-badge">v1.0.0</span>
         </div>
 
         <div id="airBadge" class="air-badge is-idle">
@@ -40,6 +37,21 @@
       </div>
 
       <div class="topbar-right">
+        <!-- PROFILE SELECTOR & MANAGER -->
+        <div class="profile-bar">
+          <i class="fa-solid fa-folder-tree profile-ico" title="Profil actif"></i>
+          <select id="profileSelect" class="profile-select" title="Changer de profil d'émission"></select>
+          <button id="btnOpenProfiles" class="btn-profile-mgr" title="Gérer les profils, importer plusieurs fichiers JSON, exporter...">
+            <i class="fa-solid fa-sliders"></i>
+            <span>Profils</span>
+          </button>
+        </div>
+
+        <button id="btnOpenGalleryTop" class="btn-gallery-top" title="Ouvrir la galerie de templates et thèmes (Noël, Fêtes, Broadcast, Créatif...)">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>Galerie de Templates</span>
+        </button>
+
         <div class="net-pill" id="btnCopyOverlayUrl" title="Copier l'URL de l'overlay pour vMix">
           <span id="overlayConnDot" class="conn-dot" title="Clients overlay connectés"></span>
           <span id="overlayCountLabel">0 vMix</span>
@@ -53,26 +65,43 @@
           <i class="fa-solid fa-up-right-from-square"></i>
         </a>
 
-        <button id="btnExport" class="btn-icon" title="Exporter JSON">
+        <button id="btnExport" class="btn-icon" title="Exporter le profil actif (.json)">
           <i class="fa-solid fa-download"></i>
         </button>
 
-        <button id="btnImport" class="btn-icon" title="Importer JSON">
+        <button id="btnImport" class="btn-icon" title="Importer un ou plusieurs profils (.json)">
           <i class="fa-solid fa-upload"></i>
         </button>
-        <input type="file" id="fileImport" accept=".json" class="hidden">
+        <input type="file" id="fileImport" accept=".json" multiple class="hidden">
+
+        <button id="btnOpenSettings" class="btn-settings-top" title="Paramètres, Plugin Stream Deck, Mises à jour GitHub & Volets">
+          <i class="fa-solid fa-gear"></i>
+          <span>Paramètres</span>
+          <span id="settingsAlertDot" class="settings-alert-dot hidden"></span>
+        </button>
       </div>
     </header>
 
-    <!-- MAIN 3-COLUMN WORKSPACE -->
-    <main class="workspace">
+    <!-- MAIN 3-COLUMN WORKSPACE (WITH COLLAPSIBLE PANELS) -->
+    <main id="mainWorkspace" class="workspace">
+      <!-- COLLAPSED LEFT RAIL -->
+      <button type="button" id="railLeft" class="collapsed-rail rail-left hidden" title="Déplier le volet Bibliothèque d'Assets">
+        <i class="fa-solid fa-angles-right"></i>
+        <span class="rail-label">ASSETS</span>
+      </button>
+
       <!-- LEFT: UNIFIED ASSETS LIBRARY / RUNDOWN -->
-      <aside class="panel panel-assets">
+      <aside id="panelLeft" class="panel panel-assets">
         <div class="panel-head">
-          <div class="filter-tabs" role="tablist">
-            <button class="filter-tab active" data-filter="all">Tous</button>
-            <button class="filter-tab" data-filter="synthe">Synthés</button>
-            <button class="filter-tab" data-filter="titre">Titres</button>
+          <div class="panel-top-row">
+            <div class="filter-tabs" role="tablist">
+              <button class="filter-tab active" data-filter="all">Tous</button>
+              <button class="filter-tab" data-filter="synthe">Synthés</button>
+              <button class="filter-tab" data-filter="titre">Titres</button>
+            </div>
+            <button type="button" id="btnCollapseLeft" class="btn-fold-panel" title="Replier le volet Assets (Cmd/Ctrl+1)">
+              <i class="fa-solid fa-angles-left"></i>
+            </button>
           </div>
           <div class="create-btns">
             <button id="btnNewSynthe" class="btn-add" title="Nouveau Synthé (Bas-Gauche)">
@@ -82,6 +111,9 @@
               <i class="fa-solid fa-plus"></i> Titre
             </button>
           </div>
+          <button id="btnOpenGallerySide" class="btn-gallery-side">
+            <i class="fa-solid fa-layer-group"></i> Explorer la Galerie de Templates (36+)
+          </button>
         </div>
 
         <div class="search-bar">
@@ -184,6 +216,10 @@
           </div>
 
           <div class="transport-save">
+            <label class="autosave-pill" title="Enregistrer automatiquement toute modification sans confirmation">
+              <input type="checkbox" id="chkAutoSave">
+              <span>Auto-save</span>
+            </label>
             <button id="btnScratch" class="btn-sec" title="Préparer un direct libre sans toucher aux assets enregistrés">
               <i class="fa-solid fa-pen-to-square"></i> Direct libre
             </button>
@@ -201,16 +237,19 @@
       </section>
 
       <!-- RIGHT: COMPLETE CUSTOMIZATION INSPECTOR -->
-      <aside class="panel panel-inspector">
+      <aside id="panelRight" class="panel panel-inspector">
         <div class="inspector-tabs">
           <button class="insp-tab active" data-tab="content">
             <i class="fa-solid fa-pen"></i> Contenu
           </button>
           <button class="insp-tab" data-tab="style">
-            <i class="fa-solid fa-sliders"></i> Visuel
+            <i class="fa-solid fa-palette"></i> Visuel & Thèmes
           </button>
           <button class="insp-tab" data-tab="typo">
             <i class="fa-solid fa-font"></i> Typo & Motion
+          </button>
+          <button type="button" id="btnCollapseRight" class="btn-fold-insp" title="Replier le volet Inspecteur (Cmd/Ctrl+2)">
+            <i class="fa-solid fa-angles-right"></i>
           </button>
         </div>
 
@@ -289,42 +328,85 @@
             </div>
           </div>
 
-          <!-- TAB 2: STYLE, COLORS & GEOMETRY -->
+          <!-- TAB 2: STYLE, THEMES, FESTIVE DECORS, COLORS & GEOMETRY -->
           <div class="insp-pane" id="tab-style">
             <div class="field-group">
-              <label class="field-label">Rendu visuel</label>
-              <div class="layout-cards">
+              <label class="field-label">Architecture visuelle (12 Layouts)</label>
+              <div class="layout-cards-grid">
                 <button type="button" class="layout-btn" data-layout="layered">Décalé</button>
                 <button type="button" class="layout-btn" data-layout="split">Unifié</button>
                 <button type="button" class="layout-btn" data-layout="capsule">Capsule</button>
                 <button type="button" class="layout-btn" data-layout="minimal">Minimal</button>
+                <button type="button" class="layout-btn" data-layout="editorial">Éditorial</button>
+                <button type="button" class="layout-btn" data-layout="brutalist">Brutaliste</button>
+                <button type="button" class="layout-btn" data-layout="ribbon">Ruban</button>
+                <button type="button" class="layout-btn" data-layout="floating">Flottant</button>
+                <button type="button" class="layout-btn" data-layout="frame">Cadre</button>
+                <button type="button" class="layout-btn" data-layout="banner">Bannière</button>
+                <button type="button" class="layout-btn" data-layout="badge-card">Médaillon</button>
+                <button type="button" class="layout-btn" data-layout="ticket">Ticket</button>
               </div>
             </div>
 
             <div class="field-group">
-              <label class="field-label">Thèmes rapides (Charte)</label>
-              <div class="theme-presets" id="themePresets">
-                <button type="button" class="theme-chip" data-theme="light-gold" title="Blanc / Jaune / Anthracite">
-                  <span style="background:#FAB001"></span><span style="background:#FFFFFF"></span><span style="background:#000000"></span>
-                </button>
-                <button type="button" class="theme-chip" data-theme="grey-gold" title="Anthracite / Jaune / Blanc">
-                  <span style="background:#FAB001"></span><span style="background:#404040"></span><span style="background:#FFFFFF"></span>
-                </button>
-                <button type="button" class="theme-chip" data-theme="black-gold" title="Noir / Jaune / Blanc">
-                  <span style="background:#FAB001"></span><span style="background:#000000"></span><span style="background:#FFFFFF"></span>
-                </button>
-                <button type="button" class="theme-chip" data-theme="gold-black" title="Jaune / Noir / Blanc">
-                  <span style="background:#000000"></span><span style="background:#FAB001"></span><span style="background:#404040"></span>
-                </button>
-                <button type="button" class="theme-chip" data-theme="clean-white" title="Blanc / Anthracite">
-                  <span style="background:#404040"></span><span style="background:#FFFFFF"></span><span style="background:#FAB001"></span>
-                </button>
+              <div class="flex-between">
+                <label class="field-label">Thèmes & Ambiances (28 Presets)</label>
+                <div class="mini-cat-tabs" id="themeCatTabs">
+                  <button type="button" class="mini-tab active" data-tcat="mmi">MMI & TV</button>
+                  <button type="button" class="mini-tab" data-tcat="noel">Noël & Hiver</button>
+                  <button type="button" class="mini-tab" data-tcat="fetes">Fêtes</button>
+                  <button type="button" class="mini-tab" data-tcat="creatif">Créatif</button>
+                </div>
+              </div>
+              <div class="theme-presets-grid" id="themePresets"></div>
+            </div>
+
+            <div class="field-row-2">
+              <div class="field-group">
+                <label class="field-label" for="selDecor">Décoration / Ornement</label>
+                <select id="selDecor" class="inp-select">
+                  <option value="none">Aucune décoration</option>
+                  <option value="christmas">🎄 Noël (Houx & Guirlande)</option>
+                  <option value="christmas-hat">🎅 Bonnet de Noël & Neige</option>
+                  <option value="snowflakes">❄️ Flocons d'Hiver</option>
+                  <option value="newyear">🥂 Nouvel An & Étoiles</option>
+                  <option value="halloween">🎃 Halloween & Fantôme</option>
+                  <option value="valentines">💖 Saint-Valentin (Cœurs)</option>
+                  <option value="easter">🥚 Pâques & Printemps</option>
+                  <option value="summer">☀️ Été & Festival</option>
+                  <option value="confetti">🎉 Confettis & Fête</option>
+                  <option value="trophy">👑 Trophée & Couronne</option>
+                  <option value="music">🎵 Musique & Live</option>
+                  <option value="retro">🕹️ Rétro Gaming</option>
+                  <option value="campus">🎓 Campus & Diplôme</option>
+                  <option value="fire">🔥 Flammes & Énergie</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <label class="field-label" for="selPattern">Motif de fond</label>
+                <select id="selPattern" class="inp-select">
+                  <option value="none">Uni (Sans motif)</option>
+                  <option value="candy">🍬 Sucre d'orge (Noël)</option>
+                  <option value="snow">❄️ Flocons / Neige</option>
+                  <option value="stars">✨ Étoiles</option>
+                  <option value="stripes"> diagonal Rayures</option>
+                  <option value="dots">• Pois Pop</option>
+                  <option value="grid"># Grille Tech</option>
+                  <option value="checker">🏁 Damier Racing</option>
+                  <option value="waves">〰️ Vagues</option>
+                  <option value="chevron">⌃ Chevrons</option>
+                </select>
               </div>
             </div>
 
-            <div class="colors-matrix" id="colorsMatrix">
-              <!-- Generated dynamically by control.js with instant brand swatches (#FAB001, #FFFFFF, #404040, #000000) -->
+            <div id="patternOpacityRow" class="slider-row hidden">
+              <span class="slider-lbl">Opacité motif</span>
+              <input type="range" id="rngPatternOp" min="0.04" max="0.5" step="0.02" class="inp-range">
+              <input type="number" id="numPatternOp" min="0.04" max="0.6" step="0.02" class="inp-num">
             </div>
+
+            <div class="colors-matrix" id="colorsMatrix"></div>
 
             <div class="divider"></div>
 
@@ -388,33 +470,67 @@
 
               <div class="slider-row">
                 <span class="slider-lbl">Bordure</span>
-                <input type="range" id="rngBorderW" min="0" max="6" step="1" class="inp-range">
-                <input type="number" id="numBorderW" min="0" max="8" step="1" class="inp-num">
+                <input type="range" id="rngBorderW" min="0" max="8" step="1" class="inp-range">
+                <input type="number" id="numBorderW" min="0" max="10" step="1" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Ombre nette</span>
+                <input type="range" id="rngShadow" min="0" max="16" step="1" class="inp-range">
+                <input type="number" id="numShadow" min="0" max="20" step="1" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Inclinaison</span>
+                <input type="range" id="rngSkewX" min="-15" max="15" step="1" class="inp-range">
+                <input type="number" id="numSkewX" min="-18" max="18" step="1" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Espacement</span>
+                <input type="range" id="rngGap" min="0" max="20" step="1" class="inp-range">
+                <input type="number" id="numGap" min="0" max="28" step="1" class="inp-num">
               </div>
             </div>
           </div>
 
-          <!-- TAB 3: TYPOGRAPHY (QUICKSAND) & MOTION DESIGN -->
+          <!-- TAB 3: TYPOGRAPHY (32 LOCAL FONTS) & MOTION DESIGN (14 ANIMATIONS) -->
           <div class="insp-pane" id="tab-typo">
             <div class="field-group">
               <div class="flex-between">
-                <label class="field-label">Ligne principale (Quicksand)</label>
-                <label class="chk-pill">
-                  <input type="checkbox" id="chkPrimaryUpper">
-                  <span>MAJUSCULES</span>
-                </label>
+                <label class="field-label">Ligne principale</label>
+                <div class="inline-toggles">
+                  <label class="chk-pill">
+                    <input type="checkbox" id="chkPrimaryItalic">
+                    <span>ITALIQUE</span>
+                  </label>
+                  <label class="chk-pill">
+                    <input type="checkbox" id="chkPrimaryUpper">
+                    <span>MAJ</span>
+                  </label>
+                </div>
               </div>
+
+              <select id="selPrimaryFont" class="inp-select font-select"></select>
+
               <div class="weight-pills" data-weight-target="primaryWeight">
                 <button type="button" data-w="300" style="font-weight:300">300</button>
                 <button type="button" data-w="400" style="font-weight:400">400</button>
                 <button type="button" data-w="500" style="font-weight:500">500</button>
                 <button type="button" data-w="600" style="font-weight:600">600</button>
                 <button type="button" data-w="700" style="font-weight:700">700</button>
+                <button type="button" data-w="800" style="font-weight:800">800</button>
+                <button type="button" data-w="900" style="font-weight:900">900</button>
               </div>
               <div class="slider-row mt-8">
                 <span class="slider-lbl">Taille</span>
-                <input type="range" id="rngPrimarySize" min="16" max="60" step="1" class="inp-range">
-                <input type="number" id="numPrimarySize" min="14" max="72" step="1" class="inp-num">
+                <input type="range" id="rngPrimarySize" min="16" max="68" step="1" class="inp-range">
+                <input type="number" id="numPrimarySize" min="12" max="84" step="1" class="inp-num">
+              </div>
+              <div class="slider-row">
+                <span class="slider-lbl">Esp. lettres</span>
+                <input type="range" id="rngPrimaryLS" min="-4" max="20" step="1" class="inp-range">
+                <input type="number" id="numPrimaryLS" min="-6" max="30" step="1" class="inp-num">
               </div>
             </div>
 
@@ -422,31 +538,47 @@
 
             <div class="field-group">
               <div class="flex-between">
-                <label class="field-label">Sous-titre (Quicksand)</label>
-                <label class="chk-pill">
-                  <input type="checkbox" id="chkSecondaryUpper">
-                  <span>MAJUSCULES</span>
-                </label>
+                <label class="field-label">Sous-titre & Badge</label>
+                <div class="inline-toggles">
+                  <label class="chk-pill">
+                    <input type="checkbox" id="chkSecondaryItalic">
+                    <span>ITALIQUE</span>
+                  </label>
+                  <label class="chk-pill">
+                    <input type="checkbox" id="chkSecondaryUpper">
+                    <span>MAJ</span>
+                  </label>
+                </div>
               </div>
+
+              <select id="selSecondaryFont" class="inp-select font-select"></select>
+
               <div class="weight-pills" data-weight-target="secondaryWeight">
                 <button type="button" data-w="300" style="font-weight:300">300</button>
                 <button type="button" data-w="400" style="font-weight:400">400</button>
                 <button type="button" data-w="500" style="font-weight:500">500</button>
                 <button type="button" data-w="600" style="font-weight:600">600</button>
                 <button type="button" data-w="700" style="font-weight:700">700</button>
+                <button type="button" data-w="800" style="font-weight:800">800</button>
+                <button type="button" data-w="900" style="font-weight:900">900</button>
               </div>
               <div class="slider-row mt-8">
                 <span class="slider-lbl">Taille</span>
-                <input type="range" id="rngSecondarySize" min="11" max="36" step="1" class="inp-range">
-                <input type="number" id="numSecondarySize" min="11" max="48" step="1" class="inp-num">
+                <input type="range" id="rngSecondarySize" min="11" max="42" step="1" class="inp-range">
+                <input type="number" id="numSecondarySize" min="10" max="52" step="1" class="inp-num">
+              </div>
+              <div class="slider-row">
+                <span class="slider-lbl">Esp. lettres</span>
+                <input type="range" id="rngSecondaryLS" min="-4" max="25" step="1" class="inp-range">
+                <input type="number" id="numSecondaryLS" min="-6" max="35" step="1" class="inp-num">
               </div>
             </div>
 
             <div class="divider"></div>
 
             <div class="field-group">
-              <label class="field-label">Animation (Motion Design)</label>
-              <div class="anim-cards">
+              <label class="field-label">Animation Motion Design (14 Styles)</label>
+              <div class="anim-cards-grid">
                 <button type="button" class="anim-btn" data-anim="bouncy-rise">
                   <i class="fa-solid fa-angles-up"></i>
                   <span>Rebond Broadcast</span>
@@ -459,15 +591,85 @@
                   <i class="fa-solid fa-layer-group"></i>
                   <span>Cascade Spring</span>
                 </button>
+                <button type="button" class="anim-btn" data-anim="origami-unfold">
+                  <i class="fa-solid fa-cube"></i>
+                  <span>Origami 3D</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="kinetic-slide">
+                  <i class="fa-solid fa-forward-fast"></i>
+                  <span>Glissade Cinétique</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="shutter-reveal">
+                  <i class="fa-solid fa-clapperboard"></i>
+                  <span>Volet Clap TV</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="pop-elastic">
+                  <i class="fa-solid fa-burst"></i>
+                  <span>Pop Élastique</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="wave-stagger">
+                  <i class="fa-solid fa-water"></i>
+                  <span>Vague Séquentielle</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="glitch-snap">
+                  <i class="fa-solid fa-bolt"></i>
+                  <span>Glitch Snap</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="velvet-glide">
+                  <i class="fa-solid fa-feather"></i>
+                  <span>Glissé Velours</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="festive-sparkle">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  <span>Éclat Festif</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="snow-bounce">
+                  <i class="fa-solid fa-snowflake"></i>
+                  <span>Rebond Hivernal</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="whip-skew">
+                  <i class="fa-solid fa-wind"></i>
+                  <span>Fouet Skew</span>
+                </button>
+                <button type="button" class="anim-btn" data-anim="flip-3d">
+                  <i class="fa-solid fa-rotate"></i>
+                  <span>Bascule 3D</span>
+                </button>
               </div>
             </div>
 
             <div class="field-group">
-              <label class="field-label">Cadence d'animation</label>
-              <div class="segmented-3">
-                <button type="button" class="seg-btn" data-speed="0.78">Vive</button>
-                <button type="button" class="seg-btn" data-speed="1">Normale</button>
-                <button type="button" class="seg-btn" data-speed="1.25">Souple</button>
+              <label class="field-label">Direction d'entrée / sortie</label>
+              <div class="segmented-5">
+                <button type="button" class="seg-btn" data-dir="bottom" title="Depuis le bas">
+                  <i class="fa-solid fa-arrow-up"></i> Bas
+                </button>
+                <button type="button" class="seg-btn" data-dir="left" title="Depuis la gauche">
+                  <i class="fa-solid fa-arrow-right"></i> Gauche
+                </button>
+                <button type="button" class="seg-btn" data-dir="right" title="Depuis la droite">
+                  <i class="fa-solid fa-arrow-left"></i> Droite
+                </button>
+                <button type="button" class="seg-btn" data-dir="top" title="Depuis le haut">
+                  <i class="fa-solid fa-arrow-down"></i> Haut
+                </button>
+                <button type="button" class="seg-btn" data-dir="scale" title="Zoom sur place">
+                  <i class="fa-solid fa-expand"></i> Zoom
+                </button>
+              </div>
+            </div>
+
+            <div class="sliders-stack">
+              <div class="slider-row">
+                <span class="slider-lbl">Durée anim.</span>
+                <input type="range" id="rngAnimSpeed" min="0.5" max="1.8" step="0.05" class="inp-range">
+                <input type="number" id="numAnimSpeed" min="0.4" max="2.2" step="0.05" class="inp-num">
+              </div>
+
+              <div class="slider-row">
+                <span class="slider-lbl">Rebond / Élast.</span>
+                <input type="range" id="rngAnimBounce" min="0.5" max="2.0" step="0.05" class="inp-range">
+                <input type="number" id="numAnimBounce" min="0.4" max="2.4" step="0.05" class="inp-num">
               </div>
             </div>
 
@@ -487,7 +689,298 @@
           </div>
         </div>
       </aside>
+
+      <!-- COLLAPSED RIGHT RAIL -->
+      <button type="button" id="railRight" class="collapsed-rail rail-right hidden" title="Déplier le volet Inspecteur">
+        <i class="fa-solid fa-angles-left"></i>
+        <span class="rail-label">INSPECTEUR</span>
+      </button>
     </main>
+  </div>
+
+  <!-- TEMPLATE GALLERY MODAL (36+ Editable Presets with Live Previews) -->
+  <div id="galleryModal" class="gallery-modal hidden" role="dialog" aria-modal="true">
+    <div class="gallery-backdrop" id="galleryBackdrop"></div>
+    <div class="gallery-dialog">
+      <div class="gallery-header">
+        <div class="gallery-title-wrap">
+          <i class="fa-solid fa-wand-magic-sparkles gallery-ico"></i>
+          <div>
+            <h2 class="gallery-title">Galerie de Templates & Thèmes</h2>
+            <p class="gallery-sub">100% éditables (polices, couleurs, formes, animations, ornements) • Créez un nouvel asset ou appliquez uniquement le style</p>
+          </div>
+        </div>
+
+        <div class="gallery-controls">
+          <div class="gallery-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="gallerySearchInput" placeholder="Rechercher (Noël, JT, Gaming, Gala, Sport...)">
+          </div>
+          <button type="button" id="btnCloseGallery" class="btn-close-gallery" title="Fermer">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="gallery-cats" id="galleryCatBar">
+        <button type="button" class="gal-cat-btn active" data-gcat="all">
+          <i class="fa-solid fa-border-all"></i> Tous les Templates
+        </button>
+        <button type="button" class="gal-cat-btn" data-gcat="noel">
+          <i class="fa-solid fa-snowflake"></i> Noël & Hiver
+        </button>
+        <button type="button" class="gal-cat-btn" data-gcat="fetes">
+          <i class="fa-solid fa-champagne-glasses"></i> Fêtes & Saisons
+        </button>
+        <button type="button" class="gal-cat-btn" data-gcat="mmi">
+          <i class="fa-solid fa-tv"></i> MMI, JT & Plateau
+        </button>
+        <button type="button" class="gal-cat-btn" data-gcat="creatif">
+          <i class="fa-solid fa-gamepad"></i> Créatif, Gaming & Sport
+        </button>
+        <button type="button" class="gal-cat-btn" data-gcat="titres">
+          <i class="fa-solid fa-closed-captioning"></i> Titres de Séquence
+        </button>
+      </div>
+
+      <div id="galleryGrid" class="gallery-grid"></div>
+    </div>
+  </div>
+
+  <!-- PROFILE MANAGER MODAL (Multi-Profiles + Multi-File JSON Import/Export) -->
+  <div id="profilesModal" class="gallery-modal hidden" role="dialog" aria-modal="true">
+    <div class="gallery-backdrop" id="profilesBackdrop"></div>
+    <div class="profiles-dialog">
+      <div class="gallery-header">
+        <div class="gallery-title-wrap">
+          <i class="fa-solid fa-folder-tree gallery-ico"></i>
+          <div>
+            <h2 class="gallery-title">Gestionnaire de Profils & Sauvegardes</h2>
+            <p class="gallery-sub">Créez plusieurs profils d'émissions, importez un ou plusieurs fichiers JSON d'un coup, et tout reste sauvegardé sur le serveur</p>
+          </div>
+        </div>
+        <button type="button" id="btnCloseProfiles" class="btn-close-gallery" title="Fermer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="profiles-body">
+        <!-- Create New Profile Row -->
+        <div class="prof-section">
+          <div class="prof-section-head">
+            <h3><i class="fa-solid fa-plus-circle"></i> Nouveau Profil</h3>
+          </div>
+          <div class="prof-create-bar">
+            <input type="text" id="inpNewProfileName" class="inp-text" placeholder="Nom du profil (ex: JT MMI, Émission Noël, Plateau Sport...)">
+            <select id="selNewProfileMode" class="inp-select prof-mode-select">
+              <option value="defaults">Avec presets de base</option>
+              <option value="copy">Dupliquer le profil actif</option>
+              <option value="empty">Profil vide (1 synthé vierge)</option>
+            </select>
+            <button type="button" id="btnCreateProfile" class="btn-broadcast btn-take">
+              <i class="fa-solid fa-plus"></i> Créer le profil
+            </button>
+          </div>
+        </div>
+
+        <!-- Saved Profiles List -->
+        <div class="prof-section">
+          <div class="prof-section-head">
+            <h3><i class="fa-solid fa-layer-group"></i> Profils Enregistrés (<span id="profilesCountBadge">1</span>)</h3>
+            <button type="button" id="btnExportAllProfiles" class="btn-sec" title="Exporter l'intégralité des profils dans un seul fichier JSON">
+              <i class="fa-solid fa-file-export"></i> Tout exporter (.json)
+            </button>
+          </div>
+          <div id="profilesListContainer" class="profiles-list"></div>
+        </div>
+
+        <!-- Multi-File Import Section -->
+        <div class="prof-section">
+          <div class="prof-section-head">
+            <h3><i class="fa-solid fa-file-import"></i> Importation Multi-Fichiers (.json)</h3>
+          </div>
+          <div class="prof-import-box">
+            <div class="prof-import-opts">
+              <label class="field-label" for="selImportMode">Comportement à l'importation :</label>
+              <select id="selImportMode" class="inp-select">
+                <option value="new-profiles">Créer un nouveau profil sauvegardé par fichier importé (Recommandé)</option>
+                <option value="merge">Ajouter / Fusionner les assets dans le profil actif</option>
+                <option value="replace">Remplacer les assets du profil actif</option>
+              </select>
+            </div>
+            <div class="prof-import-actions">
+              <button type="button" id="btnTriggerMultiImport" class="btn-broadcast btn-take">
+                <i class="fa-solid fa-upload"></i> Choisir un ou plusieurs fichiers .JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNSAVED CHANGES CONFIRMATION MODAL -->
+  <div id="unsavedModal" class="gallery-modal hidden" role="dialog" aria-modal="true">
+    <div class="gallery-backdrop" id="unsavedBackdrop"></div>
+    <div class="unsaved-dialog">
+      <div class="unsaved-icon-wrap">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 class="unsaved-title">Modifications non enregistrées</h3>
+      <p class="unsaved-desc">
+        L'asset en cours d'édition (<strong id="unsavedAssetName">Sans titre</strong>) contient des modifications qui n'ont pas encore été enregistrées. Voulez-vous les sauvegarder avant de continuer ?
+      </p>
+      <div class="unsaved-actions">
+        <button type="button" id="btnUnsavedSave" class="btn-broadcast btn-take">
+          <i class="fa-solid fa-floppy-disk"></i> Enregistrer et continuer
+        </button>
+        <button type="button" id="btnUnsavedDiscard" class="btn-sec btn-danger-outline">
+          <i class="fa-solid fa-trash-arrow-up"></i> Ignorer les modifications
+        </button>
+        <button type="button" id="btnUnsavedCancel" class="btn-sec">
+          Annuler
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL (Stream Deck Version Lock, GitHub Releases Updates, Panels & Tray) -->
+  <div id="settingsModal" class="gallery-modal hidden" role="dialog" aria-modal="true">
+    <div class="gallery-backdrop" id="settingsBackdrop"></div>
+    <div class="profiles-dialog settings-dialog">
+      <div class="gallery-header">
+        <div class="gallery-title-wrap">
+          <i class="fa-solid fa-gear gallery-ico"></i>
+          <div>
+            <h2 class="gallery-title">Paramètres & Système</h2>
+            <p class="gallery-sub">Plugin Stream Deck synchronisé, Mises à jour GitHub, Disposition des volets & Arrière-plan</p>
+          </div>
+        </div>
+        <button type="button" id="btnCloseSettings" class="btn-close-gallery" title="Fermer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="profiles-body">
+        <!-- 1. STREAM DECK PLUGIN (STRICT VERSION LOCK) -->
+        <div class="prof-section">
+          <div class="prof-section-head">
+            <h3><i class="fa-solid fa-table-cells-large"></i> Plugin Elgato Stream Deck (Version verrouillée)</h3>
+            <span id="sdVersionBadge" class="ver-pill">Requis : v1.0.0</span>
+          </div>
+          <p class="settings-note">
+            Le plugin Stream Deck doit obligatoirement correspondre à la version exacte du serveur installé (<strong id="sdReqVerText">v1.0.0</strong>). En cas de différence de version, les touches du Stream Deck se mettent automatiquement en sécurité (<em>Défaut Version</em>).
+          </p>
+
+          <div id="sdStatusBanner" class="sd-status-banner">
+            <span id="sdStatusDot" class="conn-dot"></span>
+            <span id="sdStatusLabel">Aucun Stream Deck connecté actuellement</span>
+          </div>
+
+          <div class="settings-btn-row">
+            <a href="/api/streamdeck-plugin" id="btnDownloadSdPlugin" class="btn-broadcast btn-take" download>
+              <i class="fa-solid fa-download"></i>
+              <span>Télécharger le plugin Stream Deck (<span id="sdBtnVerText">v1.0.0</span>)</span>
+            </a>
+            <button type="button" id="btnInstallSdPluginElectron" class="btn-sec hidden">
+              <i class="fa-solid fa-bolt"></i> Ouvrir / Installer directement dans Stream Deck
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. GITHUB RELEASES & AUTO-UPDATE -->
+        <div class="prof-section">
+          <div class="prof-section-head">
+            <h3><i class="fa-brands fa-github"></i> Version & Mises à jour GitHub</h3>
+            <span id="appVersionPill" class="ver-pill">Installé : v1.0.0</span>
+          </div>
+
+          <div class="settings-row-between">
+            <div>
+              <div class="settings-lbl-main">Dépôt officiel des Releases (.exe, .dmg & .streamDeckPlugin)</div>
+              <code id="githubRepoLabel" class="settings-code">github.com/noamdbc/overlay-mmitv3</code>
+            </div>
+            <div class="settings-btn-row">
+              <button type="button" id="btnCheckUpdatesNow" class="btn-sec">
+                <i class="fa-solid fa-arrows-rotate"></i> Vérifier les mises à jour
+              </button>
+              <button type="button" id="btnOpenGithubReleases" class="btn-sec">
+                <i class="fa-solid fa-up-right-from-square"></i> Voir sur GitHub
+              </button>
+            </div>
+          </div>
+
+          <div id="updateStatusBox" class="update-status-box">
+            <span id="updateStatusText">Cliquez sur « Vérifier les mises à jour » pour interroger GitHub Releases.</span>
+            <div id="updateDownloadLinks" class="settings-btn-row hidden"></div>
+          </div>
+
+          <label class="chk-row">
+            <input type="checkbox" id="chkUpdateOnStartup" checked>
+            <span>Vérifier automatiquement la présence d'une nouvelle version au démarrage du logiciel</span>
+          </label>
+        </div>
+
+        <!-- 3. WORKSPACE PANELS & BACKGROUND TRAY -->
+        <div class="prof-section">
+          <div class="prof-section-head">
+            <h3><i class="fa-solid fa-table-columns"></i> Affichage des Volets & Fonctionnement en Arrière-plan</h3>
+          </div>
+
+          <div class="settings-btn-row">
+            <button type="button" id="btnToggleLeftPanelSet" class="btn-sec">
+              <i class="fa-solid fa-table-list"></i> Afficher / Replier le volet Assets (Gauche)
+            </button>
+            <button type="button" id="btnToggleRightPanelSet" class="btn-sec">
+              <i class="fa-solid fa-sliders"></i> Afficher / Replier le volet Inspecteur (Droite)
+            </button>
+          </div>
+
+          <div id="electronSettingsGroup" class="electron-settings-group hidden">
+            <div class="divider"></div>
+            <label class="chk-row">
+              <input type="checkbox" id="chkCloseToTray" checked>
+              <span>Maintenir le serveur actif en arrière-plan (icône Barre des menus Mac / Zone de notification Windows) et masquer de la barre des tâches / du Dock à la fermeture de la fenêtre</span>
+            </label>
+            <div class="settings-btn-row">
+              <button type="button" id="btnOpenDataFolder" class="btn-sec">
+                <i class="fa-solid fa-folder-open"></i> Ouvrir le dossier des données locales (store.json)
+              </button>
+              <button type="button" id="btnQuitAppCompletely" class="btn-sec btn-danger-outline">
+                <i class="fa-solid fa-power-off"></i> Quitter complètement l'application & couper le serveur
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STARTUP UPDATE PROMPT MODAL -->
+  <div id="updatePromptModal" class="gallery-modal hidden" role="dialog" aria-modal="true">
+    <div class="gallery-backdrop" id="updatePromptBackdrop"></div>
+    <div class="unsaved-dialog update-prompt-dialog">
+      <div class="unsaved-icon-wrap">
+        <i class="fa-solid fa-cloud-arrow-down"></i>
+      </div>
+      <h3 class="unsaved-title">Nouvelle mise à jour disponible !</h3>
+      <p class="unsaved-desc">
+        La version <strong id="updPromptLatestVer">v1.1.0</strong> est disponible sur GitHub (version actuelle : <strong id="updPromptCurrentVer">v1.0.0</strong>).<br>
+        Voulez-vous télécharger la mise à jour (ainsi que le plugin Stream Deck associé) maintenant ?
+      </p>
+      <div id="updPromptNotes" class="upd-prompt-notes hidden"></div>
+      <div class="unsaved-actions">
+        <a id="btnUpdPromptDownloadPrimary" href="#" target="_blank" rel="noopener" class="btn-broadcast btn-take">
+          <i class="fa-solid fa-download"></i> <span id="updPromptPrimaryLabel">Télécharger la mise à jour</span>
+        </a>
+        <a id="btnUpdPromptDownloadSd" href="#" target="_blank" rel="noopener" class="btn-sec hidden">
+          <i class="fa-solid fa-puzzle-piece"></i> Télécharger le plugin Stream Deck associé
+        </a>
+        <button type="button" id="btnUpdPromptLater" class="btn-sec">
+          Plus tard
+        </button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>

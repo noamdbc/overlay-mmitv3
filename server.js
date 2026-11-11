@@ -1,28 +1,157 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const { Server } = require('socket.io');
 
+const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const APP_VERSION = String(pkgJson.version || '1.0.0').trim();
+const GITHUB_REPO = process.env.GITHUB_REPO || pkgJson.githubRepo || 'noamdbc/overlay-mmitv3';
+
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 
-const DATA_DIR = path.join(__dirname, 'data');
+const BUNDLED_DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.OVERLAY_USER_DATA_DIR
+  ? path.join(process.env.OVERLAY_USER_DATA_DIR, 'data')
+  : BUNDLED_DATA_DIR;
 const STORE_PATH = path.join(DATA_DIR, 'store.json');
+
+// Seed user data store from bundled store.json on first run in packaged Electron app
+if (DATA_DIR !== BUNDLED_DATA_DIR && !fs.existsSync(STORE_PATH)) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const bundledStore = path.join(BUNDLED_DATA_DIR, 'store.json');
+    if (fs.existsSync(bundledStore)) {
+      fs.copyFileSync(bundledStore, STORE_PATH);
+    }
+  } catch (_e) {
+    // Ignore seed error, loadStore will create defaults
+  }
+}
+
+function resolveStreamDeckPluginFile() {
+  const candidates = [
+    process.resourcesPath
+      ? path.join(process.resourcesPath, 'streamdeck-plugin', 'fr.mmitv.overlay.streamDeckPlugin')
+      : null,
+    path.join(__dirname, 'streamdeck-plugin', 'dist', 'fr.mmitv.overlay.streamDeckPlugin')
+  ].filter(Boolean);
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return candidates[candidates.length - 1];
+}
 
 // Exact durations (ms) shared with public/shared/renderer.js
 const ANIM_TIMINGS = {
   'bouncy-rise': { in: 760, out: 460 },
   'elastic-wipe': { in: 820, out: 480 },
-  'spring-cascade': { in: 860, out: 480 }
+  'spring-cascade': { in: 860, out: 480 },
+  'origami-unfold': { in: 840, out: 480 },
+  'kinetic-slide': { in: 720, out: 440 },
+  'shutter-reveal': { in: 780, out: 460 },
+  'pop-elastic': { in: 820, out: 450 },
+  'wave-stagger': { in: 880, out: 480 },
+  'glitch-snap': { in: 640, out: 380 },
+  'velvet-glide': { in: 920, out: 520 },
+  'festive-sparkle': { in: 940, out: 500 },
+  'snow-bounce': { in: 900, out: 480 },
+  'whip-skew': { in: 700, out: 420 },
+  'flip-3d': { in: 840, out: 460 }
 };
 const SWITCH_GAP_MS = 110;
 
+const VALID_LAYOUTS = [
+  'layered',
+  'split',
+  'capsule',
+  'minimal',
+  'editorial',
+  'brutalist',
+  'ribbon',
+  'floating',
+  'frame',
+  'banner',
+  'badge-card',
+  'ticket'
+];
+
+const VALID_FONTS = [
+  'Quicksand',
+  'Montserrat',
+  'Poppins',
+  'Inter',
+  'Raleway',
+  'Nunito',
+  'Space Grotesk',
+  'Oswald',
+  'Bebas Neue',
+  'Anton',
+  'Archivo Black',
+  'Righteous',
+  'Playfair Display',
+  'Cinzel',
+  'DM Serif Display',
+  'Abril Fatface',
+  'Roboto Slab',
+  'Mountains of Christmas',
+  'Great Vibes',
+  'Dancing Script',
+  'Pacifico',
+  'Lobster',
+  'Caveat',
+  'Permanent Marker',
+  'Fredoka',
+  'Baloo 2',
+  'Luckiest Guy',
+  'Bangers',
+  'Creepster',
+  'Henny Penny',
+  'JetBrains Mono',
+  'Press Start 2P'
+];
+
+const VALID_DECORS = [
+  'none',
+  'christmas',
+  'christmas-hat',
+  'snowflakes',
+  'newyear',
+  'halloween',
+  'valentines',
+  'easter',
+  'summer',
+  'confetti',
+  'trophy',
+  'music',
+  'retro',
+  'campus',
+  'fire'
+];
+
+const VALID_PATTERNS = [
+  'none',
+  'stripes',
+  'dots',
+  'grid',
+  'snow',
+  'stars',
+  'checker',
+  'candy',
+  'waves',
+  'chevron'
+];
+
+const VALID_DIRECTIONS = ['bottom', 'left', 'right', 'top', 'scale'];
+
 function getAnimDuration(asset, direction) {
   const style = ANIM_TIMINGS[asset?.animStyle] ? asset.animStyle : 'bouncy-rise';
-  const speed = clampNumber(asset?.animSpeed, 0.5, 2, 1);
+  const speed = clampNumber(asset?.animSpeed, 0.4, 2.2, 1);
   return Math.round(ANIM_TIMINGS[style][direction] * speed);
 }
 
@@ -32,8 +161,8 @@ function clampNumber(val, min, max, fallback) {
   return Math.min(max, Math.max(min, n));
 }
 
-function makeId() {
-  return 'ast_' + crypto.randomBytes(5).toString('hex');
+function makeId(prefix = 'ast_') {
+  return prefix + crypto.randomBytes(5).toString('hex');
 }
 
 function getDefaultPresets() {
@@ -57,6 +186,10 @@ function getDefaultPresets() {
       paddingY: 14,
       accentWidth: 8,
       borderWidth: 0,
+      shadowOffset: 0,
+      shadowColor: '#000000',
+      skewX: 0,
+      gap: 6,
       primaryBg: '#FFFFFF',
       primaryColor: '#000000',
       secondaryBg: '#FAB001',
@@ -67,14 +200,26 @@ function getDefaultPresets() {
       tagBg: '#000000',
       tagColor: '#FAB001',
       borderColor: '#000000',
+      decor: 'none',
+      decorColor: '#FAB001',
+      pattern: 'none',
+      patternOpacity: 0.16,
+      primaryFont: 'Quicksand',
       primarySize: 42,
       primaryWeight: 700,
       primaryUppercase: false,
+      primaryItalic: false,
+      primaryLetterSpacing: -1,
+      secondaryFont: 'Quicksand',
       secondarySize: 22,
       secondaryWeight: 600,
       secondaryUppercase: false,
+      secondaryItalic: false,
+      secondaryLetterSpacing: 1,
       animStyle: 'bouncy-rise',
-      animSpeed: 1
+      animSpeed: 1,
+      animBounce: 1,
+      animDirection: 'bottom'
     },
     {
       id: makeId(),
@@ -95,6 +240,10 @@ function getDefaultPresets() {
       paddingY: 14,
       accentWidth: 8,
       borderWidth: 0,
+      shadowOffset: 0,
+      shadowColor: '#000000',
+      skewX: 0,
+      gap: 6,
       primaryBg: '#404040',
       primaryColor: '#FFFFFF',
       secondaryBg: '#FAB001',
@@ -105,14 +254,26 @@ function getDefaultPresets() {
       tagBg: '#FAB001',
       tagColor: '#000000',
       borderColor: '#000000',
+      decor: 'none',
+      decorColor: '#FAB001',
+      pattern: 'none',
+      patternOpacity: 0.16,
+      primaryFont: 'Quicksand',
       primarySize: 40,
       primaryWeight: 700,
       primaryUppercase: false,
+      primaryItalic: false,
+      primaryLetterSpacing: -1,
+      secondaryFont: 'Quicksand',
       secondarySize: 21,
       secondaryWeight: 600,
       secondaryUppercase: false,
+      secondaryItalic: false,
+      secondaryLetterSpacing: 1,
       animStyle: 'bouncy-rise',
-      animSpeed: 1
+      animSpeed: 1,
+      animBounce: 1,
+      animDirection: 'bottom'
     },
     {
       id: makeId(),
@@ -133,6 +294,10 @@ function getDefaultPresets() {
       paddingY: 13,
       accentWidth: 6,
       borderWidth: 0,
+      shadowOffset: 0,
+      shadowColor: '#000000',
+      skewX: 0,
+      gap: 6,
       primaryBg: '#000000',
       primaryColor: '#FFFFFF',
       secondaryBg: '#FFFFFF',
@@ -143,14 +308,26 @@ function getDefaultPresets() {
       tagBg: '#FAB001',
       tagColor: '#000000',
       borderColor: '#FAB001',
+      decor: 'none',
+      decorColor: '#FAB001',
+      pattern: 'none',
+      patternOpacity: 0.16,
+      primaryFont: 'Quicksand',
       primarySize: 40,
       primaryWeight: 700,
       primaryUppercase: false,
+      primaryItalic: false,
+      primaryLetterSpacing: -1,
+      secondaryFont: 'Quicksand',
       secondarySize: 21,
       secondaryWeight: 600,
       secondaryUppercase: false,
+      secondaryItalic: false,
+      secondaryLetterSpacing: 1,
       animStyle: 'spring-cascade',
-      animSpeed: 1
+      animSpeed: 1,
+      animBounce: 1,
+      animDirection: 'bottom'
     },
     {
       id: makeId(),
@@ -171,6 +348,10 @@ function getDefaultPresets() {
       paddingY: 12,
       accentWidth: 5,
       borderWidth: 0,
+      shadowOffset: 0,
+      shadowColor: '#000000',
+      skewX: 0,
+      gap: 6,
       primaryBg: '#404040',
       primaryColor: '#FFFFFF',
       secondaryBg: '#FAB001',
@@ -181,52 +362,26 @@ function getDefaultPresets() {
       tagBg: '#FAB001',
       tagColor: '#000000',
       borderColor: '#000000',
+      decor: 'none',
+      decorColor: '#FAB001',
+      pattern: 'none',
+      patternOpacity: 0.16,
+      primaryFont: 'Quicksand',
       primarySize: 27,
       primaryWeight: 600,
       primaryUppercase: false,
+      primaryItalic: false,
+      primaryLetterSpacing: 0,
+      secondaryFont: 'Quicksand',
       secondarySize: 15,
       secondaryWeight: 700,
       secondaryUppercase: true,
+      secondaryItalic: false,
+      secondaryLetterSpacing: 6,
       animStyle: 'elastic-wipe',
-      animSpeed: 1
-    },
-    {
-      id: makeId(),
-      kind: 'titre',
-      primaryText: 'Débat : L’audiovisuel en direct',
-      secondaryText: '',
-      tagText: '',
-      icon: 'fa-solid fa-tower-broadcast',
-      mode: 'manual',
-      duration: 6,
-      layout: 'minimal',
-      align: 'center',
-      posX: 0,
-      posY: 60,
-      scale: 1,
-      borderRadius: 99,
-      paddingX: 28,
-      paddingY: 12,
-      accentWidth: 5,
-      borderWidth: 0,
-      primaryBg: '#FFFFFF',
-      primaryColor: '#000000',
-      secondaryBg: '#404040',
-      secondaryColor: '#FFFFFF',
-      accentColor: '#FAB001',
-      iconBg: '#FAB001',
-      iconColor: '#000000',
-      tagBg: '#000000',
-      tagColor: '#FAB001',
-      borderColor: '#000000',
-      primarySize: 26,
-      primaryWeight: 700,
-      primaryUppercase: false,
-      secondarySize: 15,
-      secondaryWeight: 600,
-      secondaryUppercase: true,
-      animStyle: 'bouncy-rise',
-      animSpeed: 1
+      animSpeed: 1,
+      animBounce: 1,
+      animDirection: 'bottom'
     }
   ];
 }
@@ -234,7 +389,7 @@ function getDefaultPresets() {
 function normalizeAsset(raw = {}) {
   const kind = raw.kind === 'titre' ? 'titre' : 'synthe';
   const isTitre = kind === 'titre';
-  const validWeights = [300, 400, 500, 600, 700];
+  const validWeights = [100, 200, 300, 400, 500, 600, 700, 800, 900];
   const pWeight = validWeights.includes(Number(raw.primaryWeight))
     ? Number(raw.primaryWeight)
     : (isTitre ? 600 : 700);
@@ -251,7 +406,7 @@ function normalizeAsset(raw = {}) {
     icon: typeof raw.icon === 'string' ? raw.icon.trim() : '',
     mode: raw.mode === 'manual' ? 'manual' : 'auto',
     duration: clampNumber(raw.duration, 1, 120, isTitre ? 5 : 6),
-    layout: ['layered', 'split', 'capsule', 'minimal'].includes(raw.layout)
+    layout: VALID_LAYOUTS.includes(raw.layout)
       ? raw.layout
       : (isTitre ? 'minimal' : 'layered'),
     align: ['left', 'center', 'right'].includes(raw.align)
@@ -264,7 +419,11 @@ function normalizeAsset(raw = {}) {
     paddingX: clampNumber(raw.paddingX, 8, 64, isTitre ? 24 : 26),
     paddingY: clampNumber(raw.paddingY, 4, 40, isTitre ? 11 : 14),
     accentWidth: clampNumber(raw.accentWidth, 0, 24, isTitre ? 5 : 8),
-    borderWidth: clampNumber(raw.borderWidth, 0, 8, 0),
+    borderWidth: clampNumber(raw.borderWidth, 0, 10, 0),
+    shadowOffset: clampNumber(raw.shadowOffset, 0, 20, 0),
+    shadowColor: typeof raw.shadowColor === 'string' && raw.shadowColor ? raw.shadowColor : '#000000',
+    skewX: clampNumber(raw.skewX, -18, 18, 0),
+    gap: clampNumber(raw.gap, 0, 28, 6),
     primaryBg: typeof raw.primaryBg === 'string' && raw.primaryBg ? raw.primaryBg : '#FFFFFF',
     primaryColor: typeof raw.primaryColor === 'string' && raw.primaryColor ? raw.primaryColor : '#000000',
     secondaryBg: typeof raw.secondaryBg === 'string' && raw.secondaryBg ? raw.secondaryBg : '#FAB001',
@@ -275,16 +434,41 @@ function normalizeAsset(raw = {}) {
     tagBg: typeof raw.tagBg === 'string' && raw.tagBg ? raw.tagBg : '#000000',
     tagColor: typeof raw.tagColor === 'string' && raw.tagColor ? raw.tagColor : '#FAB001',
     borderColor: typeof raw.borderColor === 'string' && raw.borderColor ? raw.borderColor : '#000000',
-    primarySize: clampNumber(raw.primarySize, 14, 72, isTitre ? 23 : 36),
+    decor: VALID_DECORS.includes(raw.decor) ? raw.decor : 'none',
+    decorColor: typeof raw.decorColor === 'string' && raw.decorColor ? raw.decorColor : '#FAB001',
+    pattern: VALID_PATTERNS.includes(raw.pattern) ? raw.pattern : 'none',
+    patternOpacity: clampNumber(raw.patternOpacity, 0.04, 0.6, 0.16),
+    primaryFont: VALID_FONTS.includes(raw.primaryFont) ? raw.primaryFont : 'Quicksand',
+    primarySize: clampNumber(raw.primarySize, 12, 84, isTitre ? 25 : 38),
     primaryWeight: pWeight,
     primaryUppercase: Boolean(raw.primaryUppercase),
-    secondarySize: clampNumber(raw.secondarySize, 11, 48, isTitre ? 14 : 19),
+    primaryItalic: Boolean(raw.primaryItalic),
+    primaryLetterSpacing: clampNumber(raw.primaryLetterSpacing, -6, 30, raw.primaryUppercase ? 4 : -1),
+    secondaryFont: VALID_FONTS.includes(raw.secondaryFont) ? raw.secondaryFont : 'Quicksand',
+    secondarySize: clampNumber(raw.secondarySize, 10, 52, isTitre ? 14 : 20),
     secondaryWeight: sWeight,
     secondaryUppercase: Boolean(raw.secondaryUppercase),
-    animStyle: ['bouncy-rise', 'elastic-wipe', 'spring-cascade'].includes(raw.animStyle)
-      ? raw.animStyle
-      : 'bouncy-rise',
-    animSpeed: clampNumber(raw.animSpeed, 0.5, 2, 1)
+    secondaryItalic: Boolean(raw.secondaryItalic),
+    secondaryLetterSpacing: clampNumber(raw.secondaryLetterSpacing, -6, 35, raw.secondaryUppercase ? 6 : 1),
+    animStyle: ANIM_TIMINGS[raw.animStyle] ? raw.animStyle : 'bouncy-rise',
+    animSpeed: clampNumber(raw.animSpeed, 0.4, 2.2, 1),
+    animBounce: clampNumber(raw.animBounce, 0.4, 2.4, 1),
+    animDirection: VALID_DIRECTIONS.includes(raw.animDirection) ? raw.animDirection : 'bottom'
+  };
+}
+
+function normalizeProfile(raw = {}, index = 0) {
+  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : makeId('prf_');
+  const name =
+    typeof raw.name === 'string' && raw.name.trim()
+      ? raw.name.trim().slice(0, 60)
+      : `Profil ${index + 1}`;
+  const assets = Array.isArray(raw.assets) ? raw.assets.map(normalizeAsset) : [];
+  return {
+    id,
+    name,
+    updatedAt: Number(raw.updatedAt) || Date.now(),
+    assets
   };
 }
 
@@ -294,16 +478,53 @@ function loadStore() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     if (!fs.existsSync(STORE_PATH)) {
-      const initial = { assets: getDefaultPresets() };
+      const defProfile = {
+        id: 'prf_default',
+        name: 'Profil Principal',
+        updatedAt: Date.now(),
+        assets: getDefaultPresets()
+      };
+      const initial = {
+        activeProfileId: defProfile.id,
+        profiles: [defProfile]
+      };
       saveStore(initial);
       return initial;
     }
+
     const raw = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
-    const assets = Array.isArray(raw.assets) ? raw.assets.map(normalizeAsset) : getDefaultPresets();
-    return { assets };
+
+    // Multi-profile store format
+    if (Array.isArray(raw.profiles) && raw.profiles.length > 0) {
+      const profiles = raw.profiles.map((p, idx) => normalizeProfile(p, idx));
+      const activeExists = profiles.some((p) => p.id === raw.activeProfileId);
+      const activeProfileId = activeExists ? raw.activeProfileId : profiles[0].id;
+      return { activeProfileId, profiles };
+    }
+
+    // Legacy single-list format migration -> preserve existing assets in "Profil Principal"
+    const legacyAssets = Array.isArray(raw.assets) ? raw.assets.map(normalizeAsset) : getDefaultPresets();
+    const migratedProfile = {
+      id: 'prf_default',
+      name: 'Profil Principal',
+      updatedAt: Date.now(),
+      assets: legacyAssets
+    };
+    const migrated = {
+      activeProfileId: migratedProfile.id,
+      profiles: [migratedProfile]
+    };
+    saveStore(migrated);
+    return migrated;
   } catch (err) {
     console.error('Store read error, initializing defaults:', err.message);
-    return { assets: getDefaultPresets() };
+    const defProfile = {
+      id: 'prf_default',
+      name: 'Profil Principal',
+      updatedAt: Date.now(),
+      assets: getDefaultPresets()
+    };
+    return { activeProfileId: defProfile.id, profiles: [defProfile] };
   }
 }
 
@@ -314,6 +535,39 @@ function saveStore(storeData) {
   const tmpPath = STORE_PATH + '.tmp';
   fs.writeFileSync(tmpPath, JSON.stringify(storeData, null, 2), 'utf8');
   fs.renameSync(tmpPath, STORE_PATH);
+}
+
+const store = loadStore();
+
+function getActiveProfile() {
+  let found = store.profiles.find((p) => p.id === store.activeProfileId);
+  if (!found) {
+    found = store.profiles[0];
+    store.activeProfileId = found.id;
+  }
+  return found;
+}
+
+function getActiveAssets() {
+  return getActiveProfile().assets;
+}
+
+function setActiveAssets(nextAssets) {
+  const prof = getActiveProfile();
+  prof.assets = nextAssets;
+  prof.updatedAt = Date.now();
+}
+
+function publicProfilesState() {
+  return {
+    activeProfileId: getActiveProfile().id,
+    profiles: store.profiles.map((p) => ({
+      id: p.id,
+      name: p.name,
+      count: p.assets.length,
+      updatedAt: p.updatedAt
+    }))
+  };
 }
 
 function getLanAddresses() {
@@ -329,7 +583,33 @@ function getLanAddresses() {
   return ips;
 }
 
-const store = loadStore();
+// Build combined @font-face CSS from all installed @fontsource packages
+let cachedFontsCss = null;
+function getAllFontsCss() {
+  if (cachedFontsCss) return cachedFontsCss;
+  const fontsourceDir = path.join(__dirname, 'node_modules/@fontsource');
+  const chunks = [];
+  try {
+    const pkgs = fs.readdirSync(fontsourceDir).sort();
+    for (const pkg of pkgs) {
+      const pkgDir = path.join(fontsourceDir, pkg);
+      if (!fs.statSync(pkgDir).isDirectory()) continue;
+      const cssFiles = fs
+        .readdirSync(pkgDir)
+        .filter((f) => /^\d00(-italic)?\.css$/.test(f))
+        .sort();
+      for (const file of cssFiles) {
+        const rawCss = fs.readFileSync(path.join(pkgDir, file), 'utf8');
+        const rewritten = rawCss.replace(/url\(\.\/files\//g, `url(/vendor/fonts/${pkg}/files/`);
+        chunks.push(rewritten);
+      }
+    }
+  } catch (err) {
+    console.error('Font CSS bundle error:', err.message);
+  }
+  cachedFontsCss = chunks.join('\n');
+  return cachedFontsCss;
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -358,9 +638,17 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '8mb' }));
+
+// Dynamic all-fonts stylesheet (offline local @fontsource bundle)
+app.get('/vendor/fonts/all-fonts.css', (_req, res) => {
+  res.setHeader('Content-Type', 'text/css; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(getAllFontsCss());
+});
 
 // Local offline-ready vendor mounts
+app.use('/vendor/fonts', express.static(path.join(__dirname, 'node_modules/@fontsource')));
 app.use('/vendor/quicksand', express.static(path.join(__dirname, 'node_modules/@fontsource/quicksand')));
 app.use('/vendor/fontawesome', express.static(path.join(__dirname, 'node_modules/@fortawesome/fontawesome-free')));
 app.use('/vendor/gsap', express.static(path.join(__dirname, 'node_modules/gsap/dist')));
@@ -374,22 +662,202 @@ app.get('/overlay', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public/overlay.html'));
 });
 
+function compareSemver(vA, vB) {
+  const clean = (v) =>
+    String(v || '0.0.0')
+      .trim()
+      .replace(/^v/i, '')
+      .split('-')[0]
+      .split('.')
+      .map((n) => parseInt(n, 10) || 0);
+  const a = clean(vA);
+  const b = clean(vB);
+  const len = Math.max(a.length, b.length, 3);
+  for (let i = 0; i < len; i++) {
+    const na = a[i] || 0;
+    const nb = b[i] || 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+function checkGitHubRelease() {
+  return new Promise((resolve) => {
+    const req = https.get(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      {
+        headers: {
+          'User-Agent': `OverlayRegie/${APP_VERSION}`,
+          Accept: 'application/vnd.github+json'
+        },
+        timeout: 5500
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => {
+          body += chunk;
+        });
+        res.on('end', () => {
+          if (res.statusCode === 404) {
+            resolve({
+              ok: true,
+              noReleasesYet: true,
+              currentVersion: APP_VERSION,
+              latestVersion: APP_VERSION,
+              hasUpdate: false,
+              githubRepo: GITHUB_REPO,
+              repoUrl: `https://github.com/${GITHUB_REPO}/releases`
+            });
+            return;
+          }
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            resolve({
+              ok: false,
+              error: `Statut GitHub HTTP ${res.statusCode}`,
+              currentVersion: APP_VERSION,
+              githubRepo: GITHUB_REPO,
+              repoUrl: `https://github.com/${GITHUB_REPO}/releases`
+            });
+            return;
+          }
+          try {
+            const data = JSON.parse(body);
+            const latestTag = String(data.tag_name || '').trim();
+            const latestVersion = latestTag.replace(/^v/i, '') || APP_VERSION;
+            const hasUpdate = compareSemver(latestVersion, APP_VERSION) > 0;
+            const releaseAssets = Array.isArray(data.assets) ? data.assets : [];
+
+            const findAssetUrl = (extRegex) => {
+              const found = releaseAssets.find((a) => extRegex.test(String(a.name || '')));
+              return found ? found.browser_download_url : null;
+            };
+
+            resolve({
+              ok: true,
+              currentVersion: APP_VERSION,
+              latestVersion,
+              hasUpdate,
+              githubRepo: GITHUB_REPO,
+              releaseName: data.name || `Release v${latestVersion}`,
+              releaseNotes: data.body || '',
+              releaseUrl: data.html_url || `https://github.com/${GITHUB_REPO}/releases`,
+              publishedAt: data.published_at || null,
+              assets: {
+                exe: findAssetUrl(/\.exe$/i),
+                dmg: findAssetUrl(/\.dmg$/i),
+                streamdeck: findAssetUrl(/\.streamDeckPlugin$/i)
+              }
+            });
+          } catch (_e) {
+            resolve({
+              ok: false,
+              error: 'Réponse GitHub invalide',
+              currentVersion: APP_VERSION,
+              githubRepo: GITHUB_REPO
+            });
+          }
+        });
+      }
+    );
+
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({
+        ok: false,
+        offline: true,
+        error: 'Hors ligne ou délai dépassé',
+        currentVersion: APP_VERSION,
+        githubRepo: GITHUB_REPO
+      });
+    });
+
+    req.on('error', () => {
+      resolve({
+        ok: false,
+        offline: true,
+        error: 'Impossible de joindre GitHub (mode hors-ligne)',
+        currentVersion: APP_VERSION,
+        githubRepo: GITHUB_REPO
+      });
+    });
+  });
+}
+
 app.get('/api/info', (_req, res) => {
   const ips = getLanAddresses();
+  const sdInfo = getStreamDeckStatus();
   res.json({
+    version: APP_VERSION,
+    githubRepo: GITHUB_REPO,
     port: PORT,
     ips,
     serverNow: Date.now(),
+    isElectron: Boolean(process.versions && process.versions.electron),
+    dataDir: DATA_DIR,
     overlayClients: countClientsByRole('overlay'),
     controlClients: countClientsByRole('control'),
-    streamdeckClients: countClientsByRole('streamdeck')
+    streamdeckClients: sdInfo.total,
+    streamdeckCompatibleClients: sdInfo.compatible,
+    streamdeckMismatchedVersions: sdInfo.mismatchedVersions
   });
 });
 
-app.get('/api/export', (_req, res) => {
+app.get('/api/check-update', async (_req, res) => {
+  const result = await checkGitHubRelease();
+  res.json(result);
+});
+
+app.get('/api/streamdeck-plugin', (_req, res) => {
+  const filePath = resolveStreamDeckPluginFile();
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ ok: false, error: 'Fichier .streamDeckPlugin introuvable' });
+  }
+  const filename = `fr.mmitv.overlay-v${APP_VERSION}.streamDeckPlugin`;
+  res.download(filePath, filename);
+});
+
+app.get('/api/export', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Disposition', 'attachment; filename="overlay-assets.json"');
-  res.send(JSON.stringify({ assets: store.assets }, null, 2));
+
+  if (req.query.all === '1') {
+    res.setHeader('Content-Disposition', 'attachment; filename="overlay-tous-les-profils.json"');
+    res.send(
+      JSON.stringify(
+        {
+          type: 'overlay-multi-profiles',
+          exportedAt: new Date().toISOString(),
+          activeProfileId: store.activeProfileId,
+          profiles: store.profiles
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  const targetId = req.query.profileId || store.activeProfileId;
+  const prof = store.profiles.find((p) => p.id === targetId) || getActiveProfile();
+  const slug =
+    prof.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'profil';
+
+  res.setHeader('Content-Disposition', `attachment; filename="profil-${slug}.json"`);
+  res.send(
+    JSON.stringify(
+      {
+        type: 'overlay-profile',
+        name: prof.name,
+        exportedAt: new Date().toISOString(),
+        assets: prof.assets
+      },
+      null,
+      2
+    )
+  );
 });
 
 // =========================================================
@@ -419,13 +887,34 @@ function clearTimers() {
   }
 }
 
+function getStreamDeckStatus() {
+  let total = 0;
+  let compatible = 0;
+  const mismatchedVersions = [];
+  for (const [, socket] of io.of('/').sockets) {
+    if (socket.data?.role === 'streamdeck') {
+      total++;
+      if (socket.data.compatible) {
+        compatible++;
+      } else {
+        mismatchedVersions.push(socket.data.pluginVersion || 'inconnue');
+      }
+    }
+  }
+  return { total, compatible, mismatchedVersions };
+}
+
 function publicAirState() {
+  const sdInfo = getStreamDeckStatus();
   return {
     ...airState,
+    serverVersion: APP_VERSION,
     serverNow: Date.now(),
     overlayClients: countClientsByRole('overlay'),
     controlClients: countClientsByRole('control'),
-    streamdeckClients: countClientsByRole('streamdeck')
+    streamdeckClients: sdInfo.total,
+    streamdeckCompatibleClients: sdInfo.compatible,
+    streamdeckMismatchedVersions: sdInfo.mismatchedVersions
   };
 }
 
@@ -434,7 +923,8 @@ function broadcastAirState() {
 }
 
 function broadcastAssets() {
-  io.emit('assets:list', store.assets);
+  io.emit('profiles:state', publicProfilesState());
+  io.emit('assets:list', getActiveAssets());
 }
 
 function countClientsByRole(role) {
@@ -492,6 +982,16 @@ function runEnter(asset) {
   }, inMs);
 }
 
+function findAssetAcrossProfiles(assetId) {
+  const active = getActiveAssets().find((a) => a.id === assetId);
+  if (active) return active;
+  for (const prof of store.profiles) {
+    const found = prof.assets.find((a) => a.id === assetId);
+    if (found) return found;
+  }
+  return null;
+}
+
 function triggerTake(rawAsset, overrideMode) {
   if (!rawAsset) return;
   const incoming = normalizeAsset({
@@ -499,20 +999,17 @@ function triggerTake(rawAsset, overrideMode) {
     mode: overrideMode === 'auto' || overrideMode === 'manual' ? overrideMode : rawAsset.mode
   });
 
-  // If nothing is visible, enter immediately
   if (airState.phase === 'IDLE' || !airState.currentAsset) {
     runEnter(incoming);
     return;
   }
 
-  // If already exiting, simply update the queued asset that will enter once exit finishes
   if (airState.phase === 'EXITING') {
     airState.queuedAsset = incoming;
     broadcastAirState();
     return;
   }
 
-  // Otherwise (ENTERING or ON_AIR): animate OUT current asset first, wait, then animate IN incoming
   clearTimers();
   const outMs = getAnimDuration(airState.currentAsset, 'out');
   airState.phase = 'EXITING';
@@ -555,7 +1052,6 @@ function triggerOut() {
     return;
   }
 
-  // If already exiting, cancel any queued asset so it finishes to IDLE
   if (airState.phase === 'EXITING') {
     airState.queuedAsset = null;
     broadcastAirState();
@@ -635,55 +1131,78 @@ io.on('connection', (socket) => {
     qRole === 'overlay' ? 'overlay' : qRole === 'streamdeck' ? 'streamdeck' : 'control';
   socket.data.role = role;
 
-  socket.emit('assets:list', store.assets);
+  if (role === 'streamdeck') {
+    const pluginVersion = String(socket.handshake.query?.pluginVersion || '').trim();
+    const compatible = pluginVersion === APP_VERSION;
+    socket.data.pluginVersion = pluginVersion || 'inconnue';
+    socket.data.compatible = compatible;
+    socket.emit('version:check', {
+      serverVersion: APP_VERSION,
+      pluginVersion: socket.data.pluginVersion,
+      compatible
+    });
+  } else {
+    socket.data.compatible = true;
+  }
+
+  socket.emit('profiles:state', publicProfilesState());
+  socket.emit('assets:list', getActiveAssets());
   socket.emit('air:state', publicAirState());
   broadcastAirState();
 
   socket.on('air:take', (payload = {}) => {
+    if (socket.data.role === 'streamdeck' && !socket.data.compatible) return;
     const targetAsset = payload.assetId
-      ? store.assets.find((a) => a.id === payload.assetId) || payload.asset
+      ? findAssetAcrossProfiles(payload.assetId) || payload.asset
       : payload.asset;
     triggerTake(targetAsset, payload.overrideMode);
   });
 
   socket.on('air:out', () => {
+    if (socket.data.role === 'streamdeck' && !socket.data.compatible) return;
     triggerOut();
   });
 
   socket.on('air:cut', () => {
+    if (socket.data.role === 'streamdeck' && !socket.data.compatible) return;
     triggerCut();
   });
 
   socket.on('air:hold', () => {
+    if (socket.data.role === 'streamdeck' && !socket.data.compatible) return;
     triggerHoldManual();
   });
 
+  // --- ASSETS IN ACTIVE PROFILE ---
   socket.on('asset:save', (rawAsset, ack) => {
     const normalized = normalizeAsset(rawAsset);
-    const idx = store.assets.findIndex((a) => a.id === normalized.id);
+    const activeList = getActiveAssets();
+    const idx = activeList.findIndex((a) => a.id === normalized.id);
     if (idx >= 0) {
-      store.assets[idx] = normalized;
+      activeList[idx] = normalized;
     } else {
-      store.assets.push(normalized);
+      activeList.push(normalized);
     }
+    getActiveProfile().updatedAt = Date.now();
     saveStore(store);
     broadcastAssets();
     if (typeof ack === 'function') ack({ ok: true, asset: normalized });
   });
 
   socket.on('asset:duplicate', (sourceAssetOrId, ack) => {
+    const activeList = getActiveAssets();
     let base = null;
-    let insertIdx = store.assets.length;
+    let insertIdx = activeList.length;
 
     if (typeof sourceAssetOrId === 'string') {
-      const idx = store.assets.findIndex((a) => a.id === sourceAssetOrId);
+      const idx = activeList.findIndex((a) => a.id === sourceAssetOrId);
       if (idx >= 0) {
-        base = store.assets[idx];
+        base = activeList[idx];
         insertIdx = idx + 1;
       }
     } else if (sourceAssetOrId && typeof sourceAssetOrId === 'object') {
       base = sourceAssetOrId;
-      const idx = store.assets.findIndex((a) => a.id === base.id);
+      const idx = activeList.findIndex((a) => a.id === base.id);
       if (idx >= 0) insertIdx = idx + 1;
     }
 
@@ -697,16 +1216,19 @@ io.on('connection', (socket) => {
       id: makeId(),
       primaryText: base.primaryText
     });
-    store.assets.splice(insertIdx, 0, copy);
+    activeList.splice(insertIdx, 0, copy);
+    getActiveProfile().updatedAt = Date.now();
     saveStore(store);
     broadcastAssets();
     if (typeof ack === 'function') ack({ ok: true, asset: copy });
   });
 
   socket.on('asset:delete', (assetId, ack) => {
-    const idx = store.assets.findIndex((a) => a.id === assetId);
+    const activeList = getActiveAssets();
+    const idx = activeList.findIndex((a) => a.id === assetId);
     if (idx >= 0) {
-      store.assets.splice(idx, 1);
+      activeList.splice(idx, 1);
+      getActiveProfile().updatedAt = Date.now();
       saveStore(store);
       broadcastAssets();
     }
@@ -715,7 +1237,8 @@ io.on('connection', (socket) => {
 
   socket.on('asset:reorder', (orderedIds = [], ack) => {
     if (!Array.isArray(orderedIds)) return;
-    const map = new Map(store.assets.map((a) => [a.id, a]));
+    const activeList = getActiveAssets();
+    const map = new Map(activeList.map((a) => [a.id, a]));
     const next = [];
     for (const id of orderedIds) {
       if (map.has(id)) {
@@ -726,7 +1249,7 @@ io.on('connection', (socket) => {
     for (const remaining of map.values()) {
       next.push(remaining);
     }
-    store.assets = next;
+    setActiveAssets(next);
     saveStore(store);
     broadcastAssets();
     if (typeof ack === 'function') ack({ ok: true });
@@ -738,14 +1261,17 @@ io.on('connection', (socket) => {
     const styleKeys = [
       'layout', 'align', 'posX', 'posY', 'scale',
       'borderRadius', 'paddingX', 'paddingY', 'accentWidth', 'borderWidth',
+      'shadowOffset', 'shadowColor', 'skewX', 'gap',
       'primaryBg', 'primaryColor', 'secondaryBg', 'secondaryColor',
       'accentColor', 'iconBg', 'iconColor', 'tagBg', 'tagColor', 'borderColor',
-      'primarySize', 'primaryWeight', 'primaryUppercase',
-      'secondarySize', 'secondaryWeight', 'secondaryUppercase',
-      'animStyle', 'animSpeed'
+      'decor', 'decorColor', 'pattern', 'patternOpacity',
+      'primaryFont', 'primarySize', 'primaryWeight', 'primaryUppercase', 'primaryItalic', 'primaryLetterSpacing',
+      'secondaryFont', 'secondarySize', 'secondaryWeight', 'secondaryUppercase', 'secondaryItalic', 'secondaryLetterSpacing',
+      'animStyle', 'animSpeed', 'animBounce', 'animDirection'
     ];
 
-    store.assets = store.assets.map((item) => {
+    const activeList = getActiveAssets();
+    const next = activeList.map((item) => {
       if (scope === 'kind' && item.kind !== s.kind) return item;
       const updated = { ...item };
       for (const k of styleKeys) {
@@ -754,20 +1280,199 @@ io.on('connection', (socket) => {
       return normalizeAsset(updated);
     });
 
+    setActiveAssets(next);
     saveStore(store);
     broadcastAssets();
     if (typeof ack === 'function') ack({ ok: true });
   });
 
+  // --- MULTI-PROFILE MANAGEMENT ---
+  socket.on('profile:switch', (profileId, ack) => {
+    if (socket.data.role === 'streamdeck' && !socket.data.compatible) return;
+    const found = store.profiles.find((p) => p.id === profileId);
+    if (!found) {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+    store.activeProfileId = found.id;
+    saveStore(store);
+    broadcastAssets();
+    if (typeof ack === 'function') ack({ ok: true, profile: found });
+  });
+
+  socket.on('profile:create', ({ name, mode = 'presets', sourceProfileId } = {}, ack) => {
+    const cleanName =
+      typeof name === 'string' && name.trim()
+        ? name.trim().slice(0, 60)
+        : `Profil ${store.profiles.length + 1}`;
+
+    let initialAssets = [];
+    if (mode === 'duplicate') {
+      const src =
+        store.profiles.find((p) => p.id === (sourceProfileId || store.activeProfileId)) ||
+        getActiveProfile();
+      initialAssets = src.assets.map((a) => normalizeAsset({ ...a, id: makeId() }));
+    } else if (mode === 'presets') {
+      initialAssets = getDefaultPresets();
+    } else {
+      initialAssets = [];
+    }
+
+    const newProf = {
+      id: makeId('prf_'),
+      name: cleanName,
+      updatedAt: Date.now(),
+      assets: initialAssets
+    };
+
+    store.profiles.push(newProf);
+    store.activeProfileId = newProf.id;
+    saveStore(store);
+    broadcastAssets();
+    if (typeof ack === 'function') ack({ ok: true, profile: newProf });
+  });
+
+  socket.on('profile:rename', ({ profileId, name } = {}, ack) => {
+    const target = store.profiles.find((p) => p.id === (profileId || store.activeProfileId));
+    if (!target || typeof name !== 'string' || !name.trim()) {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+    target.name = name.trim().slice(0, 60);
+    target.updatedAt = Date.now();
+    saveStore(store);
+    broadcastAssets();
+    if (typeof ack === 'function') ack({ ok: true, profile: target });
+  });
+
+  socket.on('profile:delete', (profileId, ack) => {
+    if (store.profiles.length <= 1) {
+      if (typeof ack === 'function') ack({ ok: false, error: 'Minimum 1 profil requis' });
+      return;
+    }
+    const idx = store.profiles.findIndex((p) => p.id === profileId);
+    if (idx < 0) {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+    store.profiles.splice(idx, 1);
+    if (store.activeProfileId === profileId) {
+      store.activeProfileId = store.profiles[0].id;
+    }
+    saveStore(store);
+    broadcastAssets();
+    if (typeof ack === 'function') ack({ ok: true, activeProfileId: store.activeProfileId });
+  });
+
+  // Import 1 or multiple JSON files (as new saved profiles, or merge/replace into current profile)
+  socket.on('profile:importMany', ({ files = [], importMode = 'new-profiles' } = {}, ack) => {
+    if (!Array.isArray(files) || files.length === 0) {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+
+    let createdProfiles = 0;
+    let importedAssets = 0;
+    let lastCreatedId = null;
+
+    for (const fileItem of files) {
+      const data = fileItem?.data;
+      const fallbackName = String(fileItem?.fileName || 'Profil importé')
+        .replace(/\.json$/i, '')
+        .replace(/[-_]+/g, ' ')
+        .trim();
+
+      if (!data) continue;
+
+      // Case 1: Full multi-profile archive { profiles: [...] }
+      if (Array.isArray(data.profiles)) {
+        for (const rawProf of data.profiles) {
+          if (!rawProf || !Array.isArray(rawProf.assets)) continue;
+          if (importMode === 'merge') {
+            const activeList = getActiveAssets();
+            for (const a of rawProf.assets) {
+              activeList.push(normalizeAsset({ ...a, id: makeId() }));
+              importedAssets++;
+            }
+          } else {
+            const np = normalizeProfile(
+              {
+                id: makeId('prf_'),
+                name: rawProf.name || fallbackName || 'Profil importé',
+                assets: rawProf.assets.map((a) => normalizeAsset({ ...a, id: makeId() }))
+              },
+              store.profiles.length
+            );
+            store.profiles.push(np);
+            lastCreatedId = np.id;
+            createdProfiles++;
+            importedAssets += np.assets.length;
+          }
+        }
+        continue;
+      }
+
+      // Case 2: Single profile object { name?, assets: [...] } or raw array [...]
+      const rawList = Array.isArray(data) ? data : Array.isArray(data.assets) ? data.assets : null;
+      if (!rawList) continue;
+
+      if (importMode === 'replace') {
+        const normalized = rawList.map((a) => normalizeAsset(a));
+        setActiveAssets(normalized);
+        importedAssets += normalized.length;
+      } else if (importMode === 'merge') {
+        const activeList = getActiveAssets();
+        for (const a of rawList) {
+          activeList.push(normalizeAsset({ ...a, id: makeId() }));
+          importedAssets++;
+        }
+        getActiveProfile().updatedAt = Date.now();
+      } else {
+        // Default 'new-profiles': save as a persistent new profile
+        const profName =
+          (typeof data.name === 'string' && data.name.trim()) ||
+          fallbackName ||
+          `Profil importé ${store.profiles.length + 1}`;
+        const np = {
+          id: makeId('prf_'),
+          name: profName.slice(0, 60),
+          updatedAt: Date.now(),
+          assets: rawList.map((a) => normalizeAsset({ ...a, id: makeId() }))
+        };
+        store.profiles.push(np);
+        lastCreatedId = np.id;
+        createdProfiles++;
+        importedAssets += np.assets.length;
+      }
+    }
+
+    if (lastCreatedId && importMode === 'new-profiles') {
+      store.activeProfileId = lastCreatedId;
+    }
+
+    saveStore(store);
+    broadcastAssets();
+    if (typeof ack === 'function') {
+      ack({
+        ok: true,
+        createdProfiles,
+        importedAssets,
+        activeProfileId: store.activeProfileId
+      });
+    }
+  });
+
+  // Backwards-compatible store:import
   socket.on('store:import', (payload = {}, ack) => {
     if (!Array.isArray(payload.assets)) {
       if (typeof ack === 'function') ack({ ok: false });
       return;
     }
-    store.assets = payload.assets.map(normalizeAsset);
+    const next = payload.assets.map(normalizeAsset);
+    setActiveAssets(next);
     saveStore(store);
     broadcastAssets();
-    if (typeof ack === 'function') ack({ ok: true, count: store.assets.length });
+    if (typeof ack === 'function') ack({ ok: true, count: next.length });
   });
 
   socket.on('disconnect', () => {
@@ -775,11 +1480,19 @@ io.on('connection', (socket) => {
   });
 });
 
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.log(`[Overlay Régie] Port ${PORT} déjà actif, réutilisation du serveur existant.`);
+  } else {
+    console.error('[Overlay Régie] Erreur serveur HTTP:', err);
+  }
+});
+
 server.listen({ port: PORT, host: '::', ipv6Only: false }, () => {
   const ips = getLanAddresses();
   const hostLocal = os.hostname().replace(/\.local$/i, '') + '.local';
   console.log('\n======================================================');
-  console.log('  OVERLAY BROADCAST SYSTEM — PRÊT');
+  console.log(`  OVERLAY BROADCAST SYSTEM v${APP_VERSION} — PRÊT`);
   console.log('======================================================');
   console.log(`  Local Contrôle : http://localhost:${PORT}/control`);
   console.log(`  Local Overlay  : http://localhost:${PORT}/overlay`);
@@ -790,3 +1503,21 @@ server.listen({ port: PORT, host: '::', ipv6Only: false }, () => {
   }
   console.log('======================================================\n');
 });
+
+module.exports = {
+  app,
+  server,
+  io,
+  PORT,
+  APP_VERSION,
+  GITHUB_REPO,
+  DATA_DIR,
+  STORE_PATH,
+  resolveStreamDeckPluginFile,
+  getLanAddresses,
+  triggerOut,
+  triggerCut,
+  triggerHoldManual,
+  getAirState: publicAirState,
+  checkGitHubRelease
+};

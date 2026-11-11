@@ -22,7 +22,7 @@ export class CutAction extends SingletonAction {
   }
 
   onKeyDown(ev) {
-    if (!bridge.connected) {
+    if (!bridge.connected || bridge.versionMismatch) {
       ev.action.showAlert();
       return;
     }
@@ -39,7 +39,10 @@ export class CutAction extends SingletonAction {
     if (!action.isKey()) return;
     const svgUri = renderCutKey({
       connected: bridge.connected,
-      airState: bridge.airState
+      airState: bridge.airState,
+      versionMismatch: bridge.versionMismatch,
+      pluginVersion: bridge.pluginVersion,
+      serverVersion: bridge.serverVersion
     });
     if (this.lastSvg.get(action.id) !== svgUri) {
       this.lastSvg.set(action.id, svgUri);

@@ -1,21 +1,132 @@
 {
   "name": "overlay-mmitv3",
   "version": "1.0.0",
-  "description": "Système d'overlay broadcast Web & LAN (Synthés & Titres) — vMix / Fill & Key",
-  "main": "server.js",
+  "description": "Système d'overlay broadcast Web & LAN (Synthés & Titres) — vMix / Fill & Key & Stream Deck",
+  "author": "Noam (noamdbc)",
+  "license": "MIT",
+  "main": "electron/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/noamdbc/overlay-mmitv3.git"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "build:streamdeck": "npm --prefix streamdeck-plugin run build"
+    "electron": "electron .",
+    "build:icons": "node scripts/generate-app-icons.mjs",
+    "build:streamdeck": "npm --prefix streamdeck-plugin run build",
+    "dist:mac": "npm run build:streamdeck && electron-builder --mac",
+    "dist:win": "npm run build:streamdeck && electron-builder --win",
+    "dist:all": "npm run build:streamdeck && electron-builder -mw"
+  },
+  "build": {
+    "appId": "fr.mmitv.overlay",
+    "productName": "Overlay Regie",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "server.js",
+      "electron/**/*",
+      "public/**/*",
+      "data/store.json",
+      "streamdeck-plugin/dist/fr.mmitv.overlay.streamDeckPlugin",
+      "build/icon.png",
+      "build/icon.ico",
+      "build/icon.icns",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "streamdeck-plugin/dist/fr.mmitv.overlay.streamDeckPlugin",
+        "to": "streamdeck-plugin/fr.mmitv.overlay.streamDeckPlugin"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "icon": "build/icon.icns",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Overlay-Regie-v${version}-${arch}.${ext}"
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Overlay-Regie-Setup-v${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Overlay Regie"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "noamdbc",
+        "repo": "overlay-mmitv3",
+        "releaseType": "release"
+      }
+    ]
   },
   "dependencies": {
+    "@fontsource/abril-fatface": "^5.3.0",
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/archivo-black": "^5.3.0",
+    "@fontsource/baloo-2": "^5.3.0",
+    "@fontsource/bangers": "^5.3.0",
+    "@fontsource/bebas-neue": "^5.3.0",
+    "@fontsource/caveat": "^5.3.0",
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/creepster": "^5.3.0",
+    "@fontsource/dancing-script": "^5.3.0",
+    "@fontsource/dm-serif-display": "^5.3.0",
+    "@fontsource/fredoka": "^5.3.0",
+    "@fontsource/great-vibes": "^5.3.0",
+    "@fontsource/henny-penny": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/lobster": "^5.3.0",
+    "@fontsource/luckiest-guy": "^5.3.0",
+    "@fontsource/montserrat": "^5.3.0",
+    "@fontsource/mountains-of-christmas": "^5.3.0",
+    "@fontsource/nunito": "^5.3.0",
+    "@fontsource/oswald": "^5.3.0",
+    "@fontsource/pacifico": "^5.3.0",
+    "@fontsource/permanent-marker": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
+    "@fontsource/poppins": "^5.3.0",
+    "@fontsource/press-start-2p": "^5.3.0",
     "@fontsource/quicksand": "^5.2.8",
+    "@fontsource/raleway": "^5.3.0",
+    "@fontsource/righteous": "^5.3.0",
+    "@fontsource/roboto-slab": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
     "@fortawesome/fontawesome-free": "^7.2.0",
     "express": "^5.2.1",
     "gsap": "^3.14.2",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
+    "electron": "^45.3.0",
+    "electron-builder": "^26.18.0",
     "socket.io-client": "^4.8.4"
   }
 }

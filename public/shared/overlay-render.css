@@ -1,6 +1,6 @@
 /* ==========================================================================
    Broadcast 1920x1080 Flat Overlay Renderer Styles
-   100% Flat (zero blur / zero drop-shadow) — Fill & Key Safe
+   100% Flat / Hard-Edge Vector — Fill & Key Safe
    ========================================================================== */
 
 .ov-stage {
@@ -15,13 +15,14 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: geometricPrecision;
+  perspective: 1200px;
 }
 
 .ov-anchor {
   position: absolute;
   display: flex;
   flex-direction: column;
-  max-width: 1560px;
+  max-width: 1640px;
 }
 
 .ov-anchor.align-left {
@@ -58,9 +59,11 @@
 }
 
 .ov-motion-rig {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   will-change: transform;
+  transform-style: preserve-3d;
 }
 
 .ov-anchor.align-left .ov-motion-rig {
@@ -75,11 +78,31 @@
   align-items: flex-end;
 }
 
+.ov-skew-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.ov-anchor.align-left .ov-skew-wrap {
+  align-items: flex-start;
+}
+
+.ov-anchor.align-center .ov-skew-wrap {
+  align-items: center;
+}
+
+.ov-anchor.align-right .ov-skew-wrap {
+  align-items: flex-end;
+}
+
 /* Text mask helper for crisp vertical kinetic typography */
 .ov-text-mask {
+  position: relative;
   display: block;
   overflow: hidden;
   line-height: 1.18;
+  z-index: 2;
 }
 
 .ov-text-inner {
@@ -90,15 +113,17 @@
 
 /* Optional top tag / eyebrow */
 .ov-tag-wrap {
-  overflow: hidden;
-  margin-bottom: 5px;
-  z-index: 3;
+  overflow: visible;
+  margin-bottom: var(--ov-gap, 6px);
+  z-index: 4;
 }
 
 .ov-tag {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 4px 12px;
+  gap: 6px;
+  padding: 5px 13px;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -108,12 +133,168 @@
 }
 
 /* ==========================================================================
+   SURFACE PATTERNS (Flat Vector Overlays inside Plates)
+   ========================================================================== */
+.ov-has-pattern {
+  position: relative;
+  overflow: hidden;
+}
+
+.ov-pattern-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: var(--pat-opacity, 0.16);
+}
+
+.ov-pat-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    currentColor 0px,
+    currentColor 6px,
+    transparent 6px,
+    transparent 16px
+  );
+}
+
+.ov-pat-candy {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #D62828 0px,
+    #D62828 10px,
+    #FFFFFF 10px,
+    #FFFFFF 20px
+  );
+}
+
+.ov-pat-dots {
+  background-image: radial-gradient(currentColor 2px, transparent 2px);
+  background-size: 14px 14px;
+}
+
+.ov-pat-grid {
+  background-image:
+    linear-gradient(to right, currentColor 1px, transparent 1px),
+    linear-gradient(to bottom, currentColor 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.ov-pat-checker {
+  background-image:
+    linear-gradient(45deg, currentColor 25%, transparent 25%),
+    linear-gradient(-45deg, currentColor 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, currentColor 75%),
+    linear-gradient(-45deg, transparent 75%, currentColor 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.ov-pat-snow {
+  background-image:
+    radial-gradient(currentColor 2.5px, transparent 2.5px),
+    radial-gradient(currentColor 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+}
+
+.ov-pat-stars {
+  background-image:
+    radial-gradient(currentColor 2px, transparent 2px),
+    radial-gradient(currentColor 3px, transparent 3px);
+  background-size: 34px 34px;
+  background-position: 4px 4px, 20px 18px;
+}
+
+.ov-pat-waves {
+  background-image: repeating-radial-gradient(
+    circle at 0 100%,
+    transparent 0,
+    transparent 9px,
+    currentColor 9px,
+    currentColor 11px
+  );
+  background-size: 24px 24px;
+}
+
+.ov-pat-chevron {
+  background-image:
+    linear-gradient(135deg, currentColor 25%, transparent 25%),
+    linear-gradient(225deg, currentColor 25%, transparent 25%);
+  background-size: 20px 20px;
+}
+
+/* ==========================================================================
+   DECORATIONS & FESTIVE ORNAMENTS LAYER
+   ========================================================================== */
+.ov-decor-layer {
+  position: absolute;
+  inset: -26px -34px;
+  pointer-events: none;
+  z-index: 10;
+  overflow: visible;
+}
+
+.ov-decor-badge {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  z-index: 11;
+}
+
+.ov-decor-badge.pos-top-left {
+  top: 4px;
+  left: 10px;
+}
+
+.ov-decor-badge.pos-top-right {
+  top: 4px;
+  right: 10px;
+}
+
+.ov-decor-badge.pos-bottom-right {
+  bottom: 6px;
+  right: 12px;
+}
+
+.ov-decor-particle {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+}
+
+.ov-garland-bar {
+  position: absolute;
+  top: 22px;
+  left: 34px;
+  right: 34px;
+  height: 10px;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: flex-start;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.ov-garland-bulb {
+  width: 9px;
+  height: 11px;
+  border-radius: 50% 50% 50% 50% / 35% 35% 65% 65%;
+  border: 1.5px solid #000000;
+  transform-origin: top center;
+}
+
+/* ==========================================================================
    LAYOUT 1: LAYERED (Décalé Flat — Signature Synthé)
    ========================================================================== */
 .ov-layout-layered .ov-main-row {
   display: inline-flex;
   align-items: stretch;
-  gap: 6px;
+  gap: var(--ov-gap, 6px);
   z-index: 2;
 }
 
@@ -127,6 +308,7 @@
 }
 
 .ov-layout-layered .ov-icon-box {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -136,14 +318,15 @@
 }
 
 .ov-layout-layered .ov-primary-plate {
+  position: relative;
   display: inline-flex;
   align-items: center;
   will-change: transform, clip-path;
 }
 
 .ov-layout-layered .ov-secondary-wrap {
-  overflow: hidden;
-  margin-top: 5px;
+  overflow: visible;
+  margin-top: var(--ov-gap, 5px);
   z-index: 1;
 }
 
@@ -156,6 +339,7 @@
 }
 
 .ov-layout-layered .ov-secondary-plate {
+  position: relative;
   display: inline-flex;
   align-items: center;
   will-change: transform, clip-path;
@@ -165,6 +349,7 @@
    LAYOUT 2: SPLIT (Bloc Unifié Flat)
    ========================================================================== */
 .ov-layout-split .ov-split-shell {
+  position: relative;
   display: inline-flex;
   align-items: stretch;
   overflow: hidden;
@@ -181,6 +366,7 @@
 }
 
 .ov-layout-split .ov-icon-box {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -197,6 +383,7 @@
 }
 
 .ov-layout-split .ov-primary-plate {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
@@ -213,6 +400,7 @@
 }
 
 .ov-layout-split .ov-secondary-plate {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
@@ -223,6 +411,7 @@
    LAYOUT 3: CAPSULE (Pilule Moderne Flat)
    ========================================================================== */
 .ov-layout-capsule .ov-primary-plate {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 14px;
@@ -235,16 +424,18 @@
 }
 
 .ov-layout-capsule .ov-icon-box {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   border-radius: 999px;
   will-change: transform;
+  z-index: 2;
 }
 
 .ov-layout-capsule .ov-secondary-wrap {
-  margin-top: 6px;
+  margin-top: var(--ov-gap, 6px);
   z-index: 1;
 }
 
@@ -257,6 +448,7 @@
 }
 
 .ov-layout-capsule .ov-secondary-plate {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -267,6 +459,7 @@
   display: inline-block;
   flex-shrink: 0;
   border-radius: 999px;
+  z-index: 2;
 }
 
 /* ==========================================================================
@@ -285,9 +478,11 @@
 }
 
 .ov-layout-minimal .ov-minimal-inner {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 14px;
+  z-index: 2;
 }
 
 .ov-anchor.align-right .ov-layout-minimal .ov-minimal-inner {
@@ -315,11 +510,350 @@
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 3;
   will-change: transform;
 }
 
 .ov-layout-minimal .ov-accent-side {
   align-self: stretch;
   flex-shrink: 0;
+  z-index: 3;
   will-change: transform;
 }
+
+/* ==========================================================================
+   LAYOUT 5: EDITORIAL (Magazine / Prestige / Documentaire)
+   ========================================================================== */
+.ov-layout-editorial {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.ov-layout-editorial .ov-ed-body {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.ov-anchor.align-right .ov-layout-editorial .ov-ed-body {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-editorial .ov-accent {
+  flex-shrink: 0;
+}
+
+.ov-layout-editorial .ov-ed-plates {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.ov-anchor.align-center .ov-layout-editorial .ov-ed-plates {
+  align-items: center;
+}
+
+.ov-anchor.align-right .ov-layout-editorial .ov-ed-plates {
+  align-items: flex-end;
+}
+
+.ov-layout-editorial .ov-primary-plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ov-layout-editorial .ov-secondary-plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ov-layout-editorial .ov-ed-rule {
+  height: 3px;
+  width: 100%;
+  margin: 2px 0;
+}
+
+/* ==========================================================================
+   LAYOUT 6: BRUTALIST (Pop / Néo-Brutaliste / Bordure & Ombre Franche)
+   ========================================================================== */
+.ov-layout-brutalist {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--ov-gap, 6px);
+}
+
+.ov-layout-brutalist .ov-brut-top {
+  display: inline-flex;
+  align-items: stretch;
+  gap: var(--ov-gap, 6px);
+}
+
+.ov-anchor.align-right .ov-layout-brutalist .ov-brut-top {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-brutalist .ov-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ov-layout-brutalist .ov-primary-plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ov-layout-brutalist .ov-secondary-plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+}
+
+.ov-anchor.align-center .ov-layout-brutalist .ov-secondary-plate {
+  align-self: center;
+}
+
+.ov-anchor.align-right .ov-layout-brutalist .ov-secondary-plate {
+  align-self: flex-end;
+}
+
+/* ==========================================================================
+   LAYOUT 7: RIBBON (Ruban Broadcast / Biseau Sport & Événement)
+   ========================================================================== */
+.ov-layout-ribbon {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--ov-gap, 5px);
+}
+
+.ov-layout-ribbon .ov-rib-main {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.ov-anchor.align-right .ov-layout-ribbon .ov-rib-main {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-ribbon .ov-primary-plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 18px) 100%, 0 100%);
+}
+
+.ov-anchor.align-right .ov-layout-ribbon .ov-primary-plate {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 18px 100%);
+}
+
+.ov-layout-ribbon .ov-secondary-plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+}
+
+/* ==========================================================================
+   LAYOUT 8: FLOATING (Modules Flottants Aérés)
+   ========================================================================== */
+.ov-layout-floating {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--ov-gap, 8px);
+}
+
+.ov-layout-floating .ov-float-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ov-gap, 10px);
+}
+
+.ov-anchor.align-right .ov-layout-floating .ov-float-row {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-floating .ov-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ov-layout-floating .ov-primary-plate,
+.ov-layout-floating .ov-secondary-plate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ==========================================================================
+   LAYOUT 9: FRAME (Cadre Prestige / Gala / Fêtes)
+   ========================================================================== */
+.ov-layout-frame .ov-frame-outer {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  padding: 5px;
+}
+
+.ov-layout-frame .ov-frame-inner {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ov-anchor.align-right .ov-layout-frame .ov-frame-inner {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-frame .ov-frame-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ov-anchor.align-center .ov-layout-frame .ov-frame-texts {
+  align-items: center;
+}
+
+.ov-anchor.align-right .ov-layout-frame .ov-frame-texts {
+  align-items: flex-end;
+}
+
+.ov-layout-frame .ov-secondary-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   LAYOUT 10: BANNER (Bandeau TV / Breaking / JT)
+   ========================================================================== */
+.ov-layout-banner .ov-banner-shell {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ov-layout-banner .ov-banner-top {
+  display: flex;
+  align-items: stretch;
+}
+
+.ov-anchor.align-right .ov-layout-banner .ov-banner-top {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-banner .ov-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ov-layout-banner .ov-primary-plate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.ov-layout-banner .ov-banner-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* ==========================================================================
+   LAYOUT 11: BADGE-CARD (Médaillon Débordant & Carte)
+   ========================================================================== */
+.ov-layout-badge-card .ov-bcard-row {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ov-anchor.align-right .ov-layout-badge-card .ov-bcard-row {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-badge-card .ov-icon-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 4;
+  margin-right: -18px;
+}
+
+.ov-anchor.align-right .ov-layout-badge-card .ov-icon-box {
+  margin-right: 0;
+  margin-left: -18px;
+}
+
+.ov-layout-badge-card .ov-bcard-body {
+  display: inline-flex;
+  flex-direction: column;
+  z-index: 2;
+}
+
+.ov-anchor.align-right .ov-layout-badge-card .ov-bcard-body {
+  align-items: flex-end;
+}
+
+/* ==========================================================================
+   LAYOUT 12: TICKET (Coupon / Billet Événementiel / Cinéma / Noël)
+   ========================================================================== */
+.ov-layout-ticket .ov-ticket-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.ov-anchor.align-right .ov-layout-ticket .ov-ticket-shell {
+  flex-direction: row-reverse;
+}
+
+.ov-layout-ticket .ov-ticket-stub {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 3px dashed rgba(0, 0, 0, 0.35);
+}
+
+.ov-anchor.align-right .ov-layout-ticket .ov-ticket-stub {
+  border-right: none;
+  border-left: 3px dashed rgba(0, 0, 0, 0.35);
+}
+
+.ov-layout-ticket .ov-ticket-main {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   GALLERY THUMBNAIL STAGE (Auto-fit & Centered inside Fixed Card Previews)
+   ========================================================================== */
+.ov-stage.ov-stage-thumb {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 28px 14px 10px;
+}
+

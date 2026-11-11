@@ -52,7 +52,7 @@ export class AssetAction extends SingletonAction {
   onKeyDown(ev) {
     this.clearPress(ev.action.id);
 
-    if (!bridge.connected) {
+    if (!bridge.connected || bridge.versionMismatch) {
       ev.action.showAlert();
       return;
     }
@@ -133,12 +133,14 @@ export class AssetAction extends SingletonAction {
     return {
       id: a.id,
       kind: a.kind,
+      align: a.align,
       primaryText: a.primaryText,
       secondaryText: a.secondaryText,
       mode: a.mode,
       duration: a.duration,
       accentColor: a.accentColor,
-      primaryBg: a.primaryBg
+      primaryBg: a.primaryBg,
+      secondaryBg: a.secondaryBg
     };
   }
 
@@ -150,8 +152,10 @@ export class AssetAction extends SingletonAction {
       s1.mode === s2.mode &&
       s1.duration === s2.duration &&
       s1.kind === s2.kind &&
+      s1.align === s2.align &&
       s1.accentColor === s2.accentColor &&
-      s1.primaryBg === s2.primaryBg
+      s1.primaryBg === s2.primaryBg &&
+      s1.secondaryBg === s2.secondaryBg
     );
   }
 
@@ -189,7 +193,10 @@ export class AssetAction extends SingletonAction {
       customLabel: settings.customLabel,
       connected: bridge.connected,
       airState: bridge.airState,
-      nowServer: bridge.getNowServer()
+      nowServer: bridge.getNowServer(),
+      versionMismatch: bridge.versionMismatch,
+      pluginVersion: bridge.pluginVersion,
+      serverVersion: bridge.serverVersion
     });
 
     if (this.lastSvgByContext.get(action.id) !== svgUri) {

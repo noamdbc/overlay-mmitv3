@@ -23,7 +23,7 @@ export class OutAction extends SingletonAction {
   }
 
   onKeyDown(ev) {
-    if (!bridge.connected) {
+    if (!bridge.connected || bridge.versionMismatch) {
       ev.action.showAlert();
       return;
     }
@@ -41,7 +41,10 @@ export class OutAction extends SingletonAction {
     const svgUri = renderOutKey({
       connected: bridge.connected,
       airState: bridge.airState,
-      nowServer: bridge.getNowServer()
+      nowServer: bridge.getNowServer(),
+      versionMismatch: bridge.versionMismatch,
+      pluginVersion: bridge.pluginVersion,
+      serverVersion: bridge.serverVersion
     });
     if (this.lastSvg.get(action.id) !== svgUri) {
       this.lastSvg.set(action.id, svgUri);

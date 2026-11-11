@@ -4,11 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0">
   <title>Overlay 1920x1080</title>
-  <link rel="stylesheet" href="/vendor/quicksand/300.css">
-  <link rel="stylesheet" href="/vendor/quicksand/400.css">
-  <link rel="stylesheet" href="/vendor/quicksand/500.css">
-  <link rel="stylesheet" href="/vendor/quicksand/600.css">
-  <link rel="stylesheet" href="/vendor/quicksand/700.css">
+  <link rel="stylesheet" href="/vendor/fonts/all-fonts.css">
   <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
   <link rel="stylesheet" href="/shared/overlay-render.css">
   <style>
@@ -31,24 +27,50 @@
     html.key-matte #stage {
       filter: brightness(0) invert(1);
     }
-    /* Hidden font preloader so all Quicksand weights are rasterized before first TAKE */
+    /* Hidden font preloader so all local typefaces are rasterized before first TAKE */
     .font-preload {
       position: absolute;
       left: -9999px;
       top: -9999px;
       opacity: 0;
       pointer-events: none;
-      font-family: 'Quicksand', sans-serif;
     }
   </style>
 </head>
 <body>
   <div class="font-preload" aria-hidden="true">
-    <span style="font-weight:300">MMI</span>
-    <span style="font-weight:400">MMI</span>
-    <span style="font-weight:500">MMI</span>
-    <span style="font-weight:600">MMI</span>
-    <span style="font-weight:700">MMI</span>
+    <span style="font-family:'Quicksand';font-weight:700">MMI</span>
+    <span style="font-family:'Montserrat';font-weight:700">MMI</span>
+    <span style="font-family:'Poppins';font-weight:700">MMI</span>
+    <span style="font-family:'Inter';font-weight:700">MMI</span>
+    <span style="font-family:'Raleway';font-weight:700">MMI</span>
+    <span style="font-family:'Nunito';font-weight:700">MMI</span>
+    <span style="font-family:'Space Grotesk';font-weight:700">MMI</span>
+    <span style="font-family:'Oswald';font-weight:700">MMI</span>
+    <span style="font-family:'Bebas Neue';font-weight:400">MMI</span>
+    <span style="font-family:'Anton';font-weight:400">MMI</span>
+    <span style="font-family:'Archivo Black';font-weight:400">MMI</span>
+    <span style="font-family:'Righteous';font-weight:400">MMI</span>
+    <span style="font-family:'Playfair Display';font-weight:700">MMI</span>
+    <span style="font-family:'Cinzel';font-weight:700">MMI</span>
+    <span style="font-family:'DM Serif Display';font-weight:400">MMI</span>
+    <span style="font-family:'Abril Fatface';font-weight:400">MMI</span>
+    <span style="font-family:'Roboto Slab';font-weight:700">MMI</span>
+    <span style="font-family:'Mountains of Christmas';font-weight:700">MMI</span>
+    <span style="font-family:'Great Vibes';font-weight:400">MMI</span>
+    <span style="font-family:'Dancing Script';font-weight:700">MMI</span>
+    <span style="font-family:'Pacifico';font-weight:400">MMI</span>
+    <span style="font-family:'Lobster';font-weight:400">MMI</span>
+    <span style="font-family:'Caveat';font-weight:700">MMI</span>
+    <span style="font-family:'Permanent Marker';font-weight:400">MMI</span>
+    <span style="font-family:'Fredoka';font-weight:700">MMI</span>
+    <span style="font-family:'Baloo 2';font-weight:700">MMI</span>
+    <span style="font-family:'Luckiest Guy';font-weight:400">MMI</span>
+    <span style="font-family:'Bangers';font-weight:400">MMI</span>
+    <span style="font-family:'Creepster';font-weight:400">MMI</span>
+    <span style="font-family:'Henny Penny';font-weight:400">MMI</span>
+    <span style="font-family:'JetBrains Mono';font-weight:700">MMI</span>
+    <span style="font-family:'Press Start 2P';font-weight:400">MMI</span>
   </div>
 
   <div id="stage" class="ov-stage"></div>

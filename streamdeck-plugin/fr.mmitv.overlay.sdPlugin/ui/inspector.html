@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="pi-wrap">
-    <!-- Server Connection Block -->
+    <!-- Top Status & Profile Card -->
     <div class="card">
       <div class="row-between">
         <div class="status-pill">
@@ -16,6 +16,17 @@
           <span id="connText">Connexion...</span>
         </div>
         <button type="button" id="btnToggleServer" class="btn-link">Serveur</button>
+      </div>
+
+      <div id="versionMismatchBox" class="mismatch-box hidden">
+        <strong>⚠ DÉFAUT DE VERSION</strong>
+        <p id="versionMismatchText">Le plugin Stream Deck ne correspond pas à la version du serveur installé.</p>
+        <p class="mismatch-sub">Ouvrez les <strong>Paramètres</strong> de l'application Overlay Régie pour installer le plugin correspondant.</p>
+      </div>
+
+      <div id="profileRow" class="profile-row hidden">
+        <label class="lbl" for="selProfile">Profil actif</label>
+        <select id="selProfile" class="inp"></select>
       </div>
 
       <div id="serverBox" class="server-box hidden">
@@ -29,24 +40,31 @@
 
     <!-- Asset Picker Section (only shown for fr.mmitv.overlay.asset) -->
     <div id="assetSection" class="section hidden">
+      <!-- Live Key Visual Preview + Custom Label -->
+      <div class="card key-preview-card">
+        <div class="key-lcd-bezel">
+          <div id="keyPreviewMini" class="key-lcd-screen"></div>
+        </div>
+        <div class="key-preview-right">
+          <label class="lbl" for="inpCustomLabel">Titre sur la touche (vide = auto)</label>
+          <div class="url-row">
+            <input type="text" id="inpCustomLabel" class="inp" placeholder="Automatique">
+            <button type="button" id="btnClearLabel" class="btn-ghost" title="Réinitialiser">×</button>
+          </div>
+          <span id="keyHintText" class="key-hint">Clic court = Direct • Clic long = Manuel</span>
+        </div>
+      </div>
+
       <div class="filter-row">
         <div class="tabs">
           <button type="button" class="tab active" data-filter="all">Tous</button>
           <button type="button" class="tab" data-filter="synthe">Synthés</button>
           <button type="button" class="tab" data-filter="titre">Titres</button>
         </div>
-        <input type="text" id="inpSearch" class="inp inp-search" placeholder="Rechercher...">
+        <input type="text" id="inpSearch" class="inp inp-search" placeholder="Filtrer un nom ou titre...">
       </div>
 
       <div id="assetList" class="asset-list"></div>
-
-      <div class="card">
-        <label class="lbl" for="inpCustomLabel">Titre sur le bouton (vide = auto)</label>
-        <div class="url-row">
-          <input type="text" id="inpCustomLabel" class="inp" placeholder="Automatique">
-          <button type="button" id="btnClearLabel" class="btn-ghost" title="Réinitialiser">×</button>
-        </div>
-      </div>
     </div>
 
     <!-- Compact Info for Transport Actions (SORTIR / CUT / MAINTENIR) -->

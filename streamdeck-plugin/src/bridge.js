@@ -1,13 +1,19 @@
 import { io } from 'socket.io-client';
 
 const DEFAULT_SERVER_URL = 'http://localhost:3000';
+const PLUGIN_VERSION = typeof __PLUGIN_VERSION__ !== 'undefined' ? __PLUGIN_VERSION__ : '1.0.0';
 
 export class OverlayBridge {
   constructor() {
     this.serverUrl = DEFAULT_SERVER_URL;
+    this.pluginVersion = PLUGIN_VERSION;
+    this.serverVersion = null;
+    this.versionMismatch = false;
     this.socket = null;
     this.connected = false;
     this.assets = [];
+    this.profiles = [];
+    this.activeProfileId = null;
     this.airState = {
       phase: 'IDLE',
       currentAsset: null,
@@ -46,11 +52,16 @@ export class OverlayBridge {
     }
 
     this.connected = false;
+    this.serverVersion = null;
+    this.versionMismatch = false;
     this.stopTicker();
     this.notifyState();
 
     this.socket = io(this.serverUrl, {
-      query: { role: 'streamdeck' },
+      query: {
+        role: 'streamdeck',
+        pluginVersion: this.pluginVersion
+      },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 500,
@@ -66,6 +77,7 @@ export class OverlayBridge {
 
     this.socket.on('disconnect', () => {
       this.connected = false;
+      this.versionMismatch = false;
       this.stopTicker();
       this.notifyState();
     });
@@ -73,7 +85,19 @@ export class OverlayBridge {
     this.socket.on('connect_error', () => {
       if (this.connected) {
         this.connected = false;
+        this.versionMismatch = false;
         this.stopTicker();
+        this.notifyState();
+      }
+    });
+
+    this.socket.on('version:check', ({ serverVersion, compatible } = {}) => {
+      if (serverVersion) {
+        this.serverVersion = String(serverVersion);
+        this.versionMismatch = compatible === false || this.serverVersion !== this.pluginVersion;
+        if (this.versionMismatch) {
+          this.stopTicker();
+        }
         this.notifyState();
       }
     });
@@ -83,10 +107,21 @@ export class OverlayBridge {
       this.notifyState();
     });
 
+    this.socket.on('profiles:state', (state) => {
+      if (!state) return;
+      this.profiles = Array.isArray(state.profiles) ? state.profiles : [];
+      this.activeProfileId = state.activeProfileId || null;
+      this.notifyState();
+    });
+
     this.socket.on('air:state', (state) => {
       if (!state) return;
       if (state.serverNow) {
         this.clockOffsetMs = state.serverNow - Date.now();
+      }
+      if (state.serverVersion) {
+        this.serverVersion = String(state.serverVersion);
+        this.versionMismatch = this.serverVersion !== this.pluginVersion;
       }
       this.airState = state;
       this.syncTicker();
@@ -106,6 +141,7 @@ export class OverlayBridge {
   hasActiveCountdown() {
     return Boolean(
       this.connected &&
+        !this.versionMismatch &&
         this.airState?.phase === 'ON_AIR' &&
         this.airState?.autoHideAt &&
         this.airState?.autoDurationMs > 0
@@ -154,7 +190,7 @@ export class OverlayBridge {
   }
 
   triggerTake(assetId, fallbackAsset, overrideMode) {
-    if (!this.socket || !this.connected) return false;
+    if (!this.socket || !this.connected || this.versionMismatch) return false;
     this.socket.emit('air:take', {
       assetId,
       asset: fallbackAsset,
@@ -164,20 +200,26 @@ export class OverlayBridge {
   }
 
   triggerOut() {
-    if (!this.socket || !this.connected) return false;
+    if (!this.socket || !this.connected || this.versionMismatch) return false;
     this.socket.emit('air:out');
     return true;
   }
 
   triggerCut() {
-    if (!this.socket || !this.connected) return false;
+    if (!this.socket || !this.connected || this.versionMismatch) return false;
     this.socket.emit('air:cut');
     return true;
   }
 
   triggerHold() {
-    if (!this.socket || !this.connected) return false;
+    if (!this.socket || !this.connected || this.versionMismatch) return false;
     this.socket.emit('air:hold');
+    return true;
+  }
+
+  switchProfile(profileId) {
+    if (!this.socket || !this.connected || this.versionMismatch || !profileId) return false;
+    this.socket.emit('profile:switch', profileId);
     return true;
   }
 
@@ -186,7 +228,12 @@ export class OverlayBridge {
       type: 'bridge:state',
       serverUrl: this.serverUrl,
       connected: this.connected,
+      pluginVersion: this.pluginVersion,
+      serverVersion: this.serverVersion,
+      versionMismatch: this.versionMismatch,
       assets: this.assets,
+      profiles: this.profiles,
+      activeProfileId: this.activeProfileId,
       airState: this.airState
     };
   }
