@@ -398,8 +398,16 @@ function buildNativeAppMenu() {
     {
       label: 'Édition',
       submenu: [
-        { role: 'undo', label: 'Annuler' },
-        { role: 'redo', label: 'Rétablir' },
+        {
+          label: 'Annuler',
+          accelerator: 'CmdOrCtrl+Z',
+          click: () => sendMenuAction('undo')
+        },
+        {
+          label: 'Rétablir',
+          accelerator: 'CmdOrCtrl+Shift+Z',
+          click: () => sendMenuAction('redo')
+        },
         { type: 'separator' },
         { role: 'cut', label: 'Couper' },
         { role: 'copy', label: 'Copier' },

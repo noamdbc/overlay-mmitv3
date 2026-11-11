@@ -1351,11 +1351,20 @@
   let autoSaveEnabled = localStorage.getItem('mmitv_autosave') === '1';
   let autoSaveTimer = null;
   let pendingUnsavedAction = null;
+  let pendingDeleteAssetId = null;
+
+  // Undo / Redo History Stack (Ctrl+Z / Cmd+Z & Ctrl+Y / Cmd+Shift+Z)
+  const MAX_HISTORY = 60;
+  let undoStack = [];
+  let redoStack = [];
+  let lastCommittedDraft = null;
+  let historyDebounceTimer = null;
+  let isApplyingHistory = false;
 
   let leftCollapsed = localStorage.getItem('mmitv_left_collapsed') === '1';
   let rightCollapsed = localStorage.getItem('mmitv_right_collapsed') === '1';
   let updateOnStartup = localStorage.getItem('mmitv_update_startup') !== '0';
-  let appVersion = '1.0.0';
+  let appVersion = '1.1.0';
   let githubRepo = 'noamdbc/overlay-mmitv3';
   let hasAvailableUpdate = false;
   let hasStreamDeckMismatch = false;
@@ -2025,8 +2034,10 @@
   function selectAssetByIdImmediate(id) {
     const found = assets.find((a) => a.id === id);
     if (!found) return;
+    flushDraftHistoryCommit();
     selectedId = found.id;
     draft = clone(found);
+    lastCommittedDraft = clone(found);
     syncInspectorFromDraft();
     renderPreviewStatic();
     updateDirtyUI(true);
@@ -2038,6 +2049,190 @@
     guardUnsavedChanges(() => {
       selectAssetByIdImmediate(id);
     });
+  }
+
+  // =========================================================
+  // Undo / Redo History Engine & Delete Asset Confirmation
+  // =========================================================
+  function updateUndoRedoButtons() {
+    const btnUndo = document.getElementById('btnUndo');
+    const btnRedo = document.getElementById('btnRedo');
+    if (btnUndo) btnUndo.disabled = undoStack.length === 0;
+    if (btnRedo) btnRedo.disabled = redoStack.length === 0;
+  }
+
+  function pushHistoryEntry(entry) {
+    if (!entry) return;
+    undoStack.push(entry);
+    if (undoStack.length > MAX_HISTORY) {
+      undoStack.shift();
+    }
+    redoStack = [];
+    updateUndoRedoButtons();
+  }
+
+  function flushDraftHistoryCommit() {
+    if (historyDebounceTimer) {
+      clearTimeout(historyDebounceTimer);
+      historyDebounceTimer = null;
+    }
+    if (isApplyingHistory || !draft || !lastCommittedDraft) return;
+    if (draft.id !== lastCommittedDraft.id) {
+      lastCommittedDraft = clone(draft);
+      return;
+    }
+    if (JSON.stringify(draft) !== JSON.stringify(lastCommittedDraft)) {
+      pushHistoryEntry({
+        type: 'draft',
+        assetId: selectedId,
+        before: clone(lastCommittedDraft),
+        after: clone(draft)
+      });
+      lastCommittedDraft = clone(draft);
+    }
+  }
+
+  function scheduleDraftHistoryCommit() {
+    if (isApplyingHistory || !draft) return;
+    if (!lastCommittedDraft || draft.id !== lastCommittedDraft.id) {
+      lastCommittedDraft = clone(draft);
+      return;
+    }
+    clearTimeout(historyDebounceTimer);
+    historyDebounceTimer = setTimeout(() => {
+      historyDebounceTimer = null;
+      flushDraftHistoryCommit();
+    }, 260);
+  }
+
+  function performUndo() {
+    flushDraftHistoryCommit();
+    if (undoStack.length === 0) {
+      showToast('Aucune action à annuler');
+      return;
+    }
+    const entry = undoStack.pop();
+    redoStack.push(entry);
+    updateUndoRedoButtons();
+
+    if (entry.type === 'delete-asset' && entry.asset) {
+      isApplyingHistory = true;
+      socket.emit('asset:save', entry.asset, (res) => {
+        if (Array.isArray(entry.prevOrderIds) && entry.prevOrderIds.length > 0) {
+          socket.emit('asset:reorder', entry.prevOrderIds);
+        }
+        if (res?.asset) {
+          selectAssetByIdImmediate(res.asset.id);
+        }
+        isApplyingHistory = false;
+        showToast(`Suppression annulée (« ${entry.asset.primaryText || 'Asset'} » restauré)`);
+      });
+      return;
+    }
+
+    if (entry.type === 'draft' && entry.before) {
+      isApplyingHistory = true;
+      if (entry.assetId && entry.assetId !== selectedId && assets.some((a) => a.id === entry.assetId)) {
+        selectedId = entry.assetId;
+      }
+      draft = clone(entry.before);
+      lastCommittedDraft = clone(entry.before);
+      syncInspectorFromDraft();
+      renderPreviewStatic();
+      updateDirtyUI(false);
+      renderAssetList();
+      isApplyingHistory = false;
+      showToast('Annulé (Ctrl+Z)');
+    }
+  }
+
+  function performRedo() {
+    flushDraftHistoryCommit();
+    if (redoStack.length === 0) {
+      showToast('Aucune action à rétablir');
+      return;
+    }
+    const entry = redoStack.pop();
+    undoStack.push(entry);
+    updateUndoRedoButtons();
+
+    if (entry.type === 'delete-asset' && entry.asset) {
+      isApplyingHistory = true;
+      executeAssetDeletion(entry.asset.id, true);
+      isApplyingHistory = false;
+      showToast(`Suppression rétablie (« ${entry.asset.primaryText || 'Asset'} »)`);
+      return;
+    }
+
+    if (entry.type === 'draft' && entry.after) {
+      isApplyingHistory = true;
+      if (entry.assetId && entry.assetId !== selectedId && assets.some((a) => a.id === entry.assetId)) {
+        selectedId = entry.assetId;
+      }
+      draft = clone(entry.after);
+      lastCommittedDraft = clone(entry.after);
+      syncInspectorFromDraft();
+      renderPreviewStatic();
+      updateDirtyUI(false);
+      renderAssetList();
+      isApplyingHistory = false;
+      showToast('Rétabli');
+    }
+  }
+
+  function openDeleteAssetModal(assetId) {
+    const item = assets.find((a) => a.id === assetId);
+    if (!item) return;
+    pendingDeleteAssetId = assetId;
+    const nameEl = document.getElementById('deleteAssetName');
+    if (nameEl) {
+      nameEl.textContent = item.primaryText || 'Sans titre';
+    }
+    document.getElementById('deleteAssetModal').classList.remove('hidden');
+  }
+
+  function closeDeleteAssetModal() {
+    document.getElementById('deleteAssetModal').classList.add('hidden');
+    pendingDeleteAssetId = null;
+  }
+
+  function executeAssetDeletion(id, skipHistory) {
+    const item = assets.find((a) => a.id === id);
+    if (!item) return;
+
+    if (!skipHistory) {
+      pushHistoryEntry({
+        type: 'delete-asset',
+        asset: clone(item),
+        prevOrderIds: assets.map((a) => a.id)
+      });
+    }
+
+    socket.emit('asset:delete', id, () => {
+      if (selectedId === id) {
+        const remaining = assets.filter((a) => a.id !== id);
+        if (remaining.length > 0) {
+          selectAssetByIdImmediate(remaining[0].id);
+        } else {
+          selectedId = null;
+          draft = makeNewTemplate('synthe');
+          lastCommittedDraft = clone(draft);
+          syncInspectorFromDraft();
+          renderPreviewStatic();
+          updateDirtyUI(true);
+        }
+      }
+      if (!skipHistory) {
+        showToast(`Asset « ${item.primaryText || 'Sans titre'} » supprimé`);
+      }
+    });
+  }
+
+  function confirmDeleteAsset() {
+    const id = pendingDeleteAssetId;
+    closeDeleteAssetModal();
+    if (!id) return;
+    executeAssetDeletion(id, false);
   }
 
   // =========================================================
@@ -2079,6 +2274,10 @@
     const btnSave = document.getElementById('btnSave');
     btnSave.classList.toggle('has-changes', dirty);
     document.getElementById('saveBtnLabel').textContent = savedExists ? 'Enregistrer' : 'Ajouter à la liste';
+
+    if (!skipAutoSave && !isApplyingHistory) {
+      scheduleDraftHistoryCommit();
+    }
 
     if (!skipAutoSave && autoSaveEnabled && dirty && savedExists) {
       clearTimeout(autoSaveTimer);
@@ -2431,10 +2630,23 @@
     setPair('rngAnimBounce', 'numAnimBounce', draft.animBounce ?? 1);
   }
 
+  function updateRangeVisual(r) {
+    if (!r) return;
+    const min = parseFloat(r.min);
+    const max = parseFloat(r.max);
+    const val = parseFloat(r.value);
+    if (Number.isNaN(min) || Number.isNaN(max) || max <= min || Number.isNaN(val)) return;
+    const pct = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
+    r.style.setProperty('--slider-pct', `${pct.toFixed(1)}%`);
+  }
+
   function setPair(rangeId, numId, val) {
     const r = document.getElementById(rangeId);
     const n = document.getElementById(numId);
-    if (r) r.value = val;
+    if (r) {
+      r.value = val;
+      updateRangeVisual(r);
+    }
     if (n) n.value = val;
   }
 
@@ -2442,6 +2654,7 @@
     const r = document.getElementById(rangeId);
     const n = document.getElementById(numId);
     if (!r || !n) return;
+    updateRangeVisual(r);
     const apply = (raw) => {
       if (!draft) return;
       const v = isFloat ? parseFloat(raw) : parseInt(raw, 10);
@@ -2449,6 +2662,7 @@
       draft[key] = v;
       if (document.activeElement !== r) r.value = v;
       if (document.activeElement !== n) n.value = v;
+      updateRangeVisual(r);
       renderPreviewStatic();
       updateDirtyUI();
     };
@@ -2566,20 +2780,7 @@
             }
           });
         } else if (act === 'del') {
-          socket.emit('asset:delete', id, () => {
-            if (selectedId === id) {
-              if (assets.length > 0) {
-                const next = assets.find((a) => a.id !== id);
-                if (next) selectAssetById(next.id);
-              } else {
-                selectedId = null;
-                draft = makeNewTemplate('synthe');
-                syncInspectorFromDraft();
-                renderPreviewStatic();
-                updateDirtyUI();
-              }
-            }
-          });
+          openDeleteAssetModal(id);
         }
         return;
       }
@@ -2923,6 +3124,15 @@
     document.getElementById('btnUnsavedCancel').addEventListener('click', closeUnsavedModal);
     document.getElementById('unsavedBackdrop').addEventListener('click', closeUnsavedModal);
 
+    // Delete Asset Confirmation Modal Buttons
+    document.getElementById('btnConfirmDeleteAsset')?.addEventListener('click', confirmDeleteAsset);
+    document.getElementById('btnCancelDeleteAsset')?.addEventListener('click', closeDeleteAssetModal);
+    document.getElementById('deleteAssetBackdrop')?.addEventListener('click', closeDeleteAssetModal);
+
+    // Undo / Redo Buttons
+    document.getElementById('btnUndo')?.addEventListener('click', performUndo);
+    document.getElementById('btnRedo')?.addEventListener('click', performRedo);
+
     // Profile Selector & Profile Manager Modal
     const profileSelect = document.getElementById('profileSelect');
     profileSelect.addEventListener('change', () => {
@@ -3199,6 +3409,12 @@
             case 'duplicate-asset':
               duplicateCurrentDraft();
               break;
+            case 'undo':
+              performUndo();
+              break;
+            case 'redo':
+              performRedo();
+              break;
             case 'export-profile':
               document.getElementById('btnExport')?.click();
               break;
@@ -3248,6 +3464,18 @@
 
     // Global Keyboard Shortcuts (Broadcast Régie)
     window.addEventListener('keydown', (e) => {
+      const delModalOpen = !document.getElementById('deleteAssetModal').classList.contains('hidden');
+      if (delModalOpen) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeDeleteAssetModal();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          confirmDeleteAsset();
+        }
+        return;
+      }
+
       const updPromptOpen = !document.getElementById('updatePromptModal').classList.contains('hidden');
       if (updPromptOpen && e.key === 'Escape') {
         e.preventDefault();
@@ -3280,6 +3508,23 @@
       if (modalOpen && e.key === 'Escape') {
         e.preventDefault();
         closeGalleryModal();
+        return;
+      }
+
+      // Undo (Cmd/Ctrl+Z) & Redo (Cmd+Shift+Z or Ctrl+Y)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          performRedo();
+        } else {
+          performUndo();
+        }
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        performRedo();
         return;
       }
 

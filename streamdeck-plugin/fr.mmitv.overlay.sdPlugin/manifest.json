@@ -2,7 +2,7 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "Name": "Overlay Régie",
   "UUID": "fr.mmitv.overlay",
-  "Version": "1.0.0.0",
+  "Version": "1.1.0.0",
   "Author": "MMI TV",
   "Description": "Pilotage en direct des synthés et titres d'overlay en régie.",
   "Category": "Overlay Régie",

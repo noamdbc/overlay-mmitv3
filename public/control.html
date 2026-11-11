@@ -17,7 +17,7 @@
         <div class="brand-mark">
           <span class="brand-dot"></span>
           <span class="brand-title">OVERLAY RÉGIE</span>
-          <span id="topVersionBadge" class="ver-badge">v1.0.0</span>
+          <span id="topVersionBadge" class="ver-badge">v1.1.0</span>
         </div>
 
         <div id="airBadge" class="air-badge is-idle">
@@ -216,6 +216,14 @@
           </div>
 
           <div class="transport-save">
+            <div class="undo-redo-group">
+              <button type="button" id="btnUndo" class="btn-sec btn-icon-sq" title="Annuler la dernière action (Cmd/Ctrl+Z)" disabled>
+                <i class="fa-solid fa-rotate-left"></i>
+              </button>
+              <button type="button" id="btnRedo" class="btn-sec btn-icon-sq" title="Rétablir l'action annulée (Cmd+Shift+Z / Ctrl+Y)" disabled>
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+            </div>
             <label class="autosave-pill" title="Enregistrer automatiquement toute modification sans confirmation">
               <input type="checkbox" id="chkAutoSave">
               <span>Auto-save</span>
@@ -223,8 +231,8 @@
             <button id="btnScratch" class="btn-sec" title="Préparer un direct libre sans toucher aux assets enregistrés">
               <i class="fa-solid fa-pen-to-square"></i> Direct libre
             </button>
-            <button id="btnRevert" class="btn-sec hidden" title="Annuler les modifications non enregistrées">
-              <i class="fa-solid fa-rotate-left"></i> Annuler
+            <button id="btnRevert" class="btn-sec hidden" title="Réinitialiser les modifications non enregistrées">
+              <i class="fa-solid fa-arrow-rotate-left"></i> Réinitialiser
             </button>
             <button id="btnDuplicate" class="btn-sec" title="Dupliquer cet asset (Ctrl+D)">
               <i class="fa-regular fa-clone"></i> Dupliquer
@@ -238,19 +246,23 @@
 
       <!-- RIGHT: COMPLETE CUSTOMIZATION INSPECTOR -->
       <aside id="panelRight" class="panel panel-inspector">
-        <div class="inspector-tabs">
-          <button class="insp-tab active" data-tab="content">
-            <i class="fa-solid fa-pen"></i> Contenu
-          </button>
-          <button class="insp-tab" data-tab="style">
-            <i class="fa-solid fa-palette"></i> Visuel & Thèmes
-          </button>
-          <button class="insp-tab" data-tab="typo">
-            <i class="fa-solid fa-font"></i> Typo & Motion
-          </button>
-          <button type="button" id="btnCollapseRight" class="btn-fold-insp" title="Replier le volet Inspecteur (Cmd/Ctrl+2)">
-            <i class="fa-solid fa-angles-right"></i>
-          </button>
+        <div class="inspector-head">
+          <div class="panel-top-row">
+            <div class="inspector-tabs" role="tablist">
+              <button class="insp-tab active" data-tab="content">
+                <i class="fa-solid fa-pen"></i> Contenu
+              </button>
+              <button class="insp-tab" data-tab="style">
+                <i class="fa-solid fa-palette"></i> Visuel
+              </button>
+              <button class="insp-tab" data-tab="typo">
+                <i class="fa-solid fa-font"></i> Typo & Motion
+              </button>
+            </div>
+            <button type="button" id="btnCollapseRight" class="btn-fold-panel" title="Replier le volet Inspecteur (Cmd/Ctrl+2)">
+              <i class="fa-solid fa-angles-right"></i>
+            </button>
+          </div>
         </div>
 
         <div class="inspector-body">
@@ -838,6 +850,29 @@
           <i class="fa-solid fa-trash-arrow-up"></i> Ignorer les modifications
         </button>
         <button type="button" id="btnUnsavedCancel" class="btn-sec">
+          Annuler
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE ASSET CONFIRMATION MODAL -->
+  <div id="deleteAssetModal" class="gallery-modal hidden" role="dialog" aria-modal="true">
+    <div class="gallery-backdrop" id="deleteAssetBackdrop"></div>
+    <div class="unsaved-dialog delete-asset-dialog">
+      <div class="unsaved-icon-wrap danger-icon-wrap">
+        <i class="fa-regular fa-trash-can"></i>
+      </div>
+      <h3 class="unsaved-title">Supprimer cet asset ?</h3>
+      <p class="unsaved-desc">
+        Voulez-vous vraiment supprimer l'asset <strong id="deleteAssetName">Sans titre</strong> de ce profil ?<br>
+        <span class="delete-undo-hint">Astuce : vous pourrez annuler cette suppression avec <kbd>Ctrl+Z</kbd> / <kbd>Cmd+Z</kbd>.</span>
+      </p>
+      <div class="unsaved-actions">
+        <button type="button" id="btnConfirmDeleteAsset" class="btn-broadcast btn-cut">
+          <i class="fa-regular fa-trash-can"></i> Supprimer l'asset
+        </button>
+        <button type="button" id="btnCancelDeleteAsset" class="btn-sec">
           Annuler
         </button>
       </div>

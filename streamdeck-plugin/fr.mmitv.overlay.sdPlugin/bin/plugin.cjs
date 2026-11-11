@@ -5,11 +5,7 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
-  try {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  } catch (e) {
-    throw mod = 0, e;
-  }
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -25801,7 +25797,7 @@ Object.assign(lookup, {
 
 // src/bridge.js
 var DEFAULT_SERVER_URL = "http://localhost:3000";
-var PLUGIN_VERSION = true ? "1.0.0" : "1.0.0";
+var PLUGIN_VERSION = true ? "1.1.0" : "1.0.0";
 var OverlayBridge = class {
   constructor() {
     this.serverUrl = DEFAULT_SERVER_URL;
