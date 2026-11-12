@@ -540,6 +540,7 @@ function createMainWindow() {
     height: 940,
     minWidth: 1100,
     minHeight: 680,
+    fullscreenable: true,
     title: 'Overlay Régie — Contrôle',
     backgroundColor: '#121212',
     icon: fs.existsSync(iconFile) ? iconFile : undefined,
@@ -591,9 +592,23 @@ function createMainWindow() {
   mainWindow.on('hide', () => {
     updateTrayMenu();
   });
+
+  mainWindow.on('leave-full-screen', () => {
+    sendMenuAction('exited-fullscreen');
+  });
 }
 
 // IPC Handlers for Control UI
+ipcMain.handle('app:set-fullscreen', (_event, enabled) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const flag = Boolean(enabled);
+    if (mainWindow.isFullScreen() !== flag) {
+      mainWindow.setFullScreen(flag);
+    }
+    return { ok: true, isFullScreen: mainWindow.isFullScreen() };
+  }
+  return { ok: false };
+});
 ipcMain.handle('app:get-settings', () => {
   return {
     closeToTray: Boolean(appSettings.closeToTray),

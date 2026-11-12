@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installStreamDeckPlugin: () => ipcRenderer.invoke('app:install-streamdeck'),
   openDataFolder: () => ipcRenderer.invoke('app:open-data-folder'),
   openExternal: (url) => ipcRenderer.invoke('app:open-external', String(url || '')),
+  setFullScreen: (enabled) => ipcRenderer.invoke('app:set-fullscreen', Boolean(enabled)),
   quitApp: () => ipcRenderer.invoke('app:quit'),
   onMenuAction: (callback) => {
     if (typeof callback !== 'function') return;

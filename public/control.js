@@ -1366,7 +1366,7 @@
   let leftPanelWidth = Math.max(240, Math.min(560, parseInt(localStorage.getItem('mmitv_left_w') || '330', 10) || 330));
   let rightPanelWidth = Math.max(320, Math.min(640, parseInt(localStorage.getItem('mmitv_right_w') || '410', 10) || 410));
   let updateOnStartup = localStorage.getItem('mmitv_update_startup') !== '0';
-  let appVersion = '1.2.0';
+  let appVersion = '1.2.1';
   let githubRepo = 'noamdbc/overlay-mmitv3';
   let hasAvailableUpdate = false;
   let hasStreamDeckMismatch = false;
@@ -1382,6 +1382,9 @@
   let fsSpeed = 1;
   let fsBgIdx = 0;
   let isScrubbingFs = false;
+  let isClosingFsPreview = false;
+  const fsBgModes = ['bg-pure-black', 'bg-checker', 'bg-dark-studio', 'bg-light-studio'];
+  const fsBgLabels = ['Fond : Noir pur', 'Fond : Damier Alpha', 'Fond : Studio Sombre', 'Fond : Studio Clair'];
 
   let airState = {
     phase: 'IDLE',
@@ -1434,9 +1437,12 @@
     const wrap = document.getElementById(wrapId);
     const scaler = document.getElementById(scalerId);
     if (!wrap || !scaler) return;
-    const pad = 16;
-    const w = Math.max(80, wrap.clientWidth - pad);
-    const h = Math.max(45, wrap.clientHeight - pad);
+    const isFs = wrapId === 'fsViewport';
+    const pad = isFs ? 0 : 16;
+    const rawW = wrap.clientWidth || (isFs ? window.innerWidth : 0);
+    const rawH = wrap.clientHeight || (isFs ? Math.max(240, window.innerHeight - 114) : 0);
+    const w = Math.max(80, rawW - pad);
+    const h = Math.max(45, rawH - pad);
     const scale = Math.min(w / 1920, h / 1080);
     scaler.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(4)})`;
   }
@@ -1601,21 +1607,52 @@
     }
     const modal = document.getElementById('fsPreviewModal');
     if (!modal) return;
+    isClosingFsPreview = false;
     modal.classList.remove('hidden');
-    requestAnimationFrame(() => {
-      fitViewport('fsViewport', 'fsScaler');
-      rebuildFsTimeline(true);
-    });
+
+    // Enter real OS / Browser fullscreen
+    if (window.electronAPI && typeof window.electronAPI.setFullScreen === 'function') {
+      window.electronAPI.setFullScreen(true).catch(() => {});
+    } else if (typeof modal.requestFullscreen === 'function' && !document.fullscreenElement) {
+      modal.requestFullscreen().catch(() => {});
+    }
+
+    fitViewport('fsViewport', 'fsScaler');
+    rebuildFsTimeline(true);
+
+    // Re-fit during/after OS fullscreen transition
+    setTimeout(() => fitViewport('fsViewport', 'fsScaler'), 80);
+    setTimeout(() => fitViewport('fsViewport', 'fsScaler'), 250);
+    setTimeout(() => fitViewport('fsViewport', 'fsScaler'), 550);
   }
 
-  function closeFsPreviewModal() {
+  function closeFsPreviewModal(fromNativeExit = false) {
+    if (isClosingFsPreview) return;
     const modal = document.getElementById('fsPreviewModal');
-    if (modal) modal.classList.add('hidden');
+    if (!modal || modal.classList.contains('hidden')) return;
+    isClosingFsPreview = true;
+
+    modal.classList.add('hidden');
     if (fsTimelineData?.tl) {
       fsTimelineData.tl.kill();
     }
     fsTimelineData = null;
     if (fsRenderer) fsRenderer.cut();
+
+    if (!fromNativeExit) {
+      if (window.electronAPI && typeof window.electronAPI.setFullScreen === 'function') {
+        window.electronAPI.setFullScreen(false).catch(() => {});
+      }
+      if (document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    requestAnimationFrame(() => {
+      fitViewport('pvwViewport', 'pvwScaler');
+      fitViewport('pgmViewport', 'pgmScaler');
+      isClosingFsPreview = false;
+    });
   }
 
   function rebuildFsTimeline(autoPlay = true) {
@@ -1625,9 +1662,9 @@
     if (titleEl) {
       titleEl.textContent = draft.primaryText || 'Sans titre';
     }
-    const badgeEl = document.getElementById('fsAnimBadge');
-    if (badgeEl) {
-      badgeEl.textContent = `${draft.animStyle || 'bouncy-rise'} • dir: ${draft.animDirection || 'bottom'} • vit: ${draft.animSpeed ?? 1}x`;
+    const specsEl = document.getElementById('fsAssetSpecs');
+    if (specsEl) {
+      specsEl.textContent = `${draft.animStyle || 'bouncy-rise'} • dir: ${draft.animDirection || 'bottom'} • vit: ${draft.animSpeed ?? 1}x`;
     }
 
     const holdSec =
@@ -1690,12 +1727,15 @@
     if (!fsTimelineData || !fsTimelineData.tl) return;
     const tl = fsTimelineData.tl;
     const t = Math.max(0, tl.time());
-    const tot = Math.max(0.1, fsTimelineData.totalDuration);
     const isPlaying = !tl.paused() && tl.progress() < 1;
 
-    const playBtn = document.getElementById('btnFsPlayPause');
-    if (playBtn) {
-      playBtn.innerHTML = `<i class="fa-solid ${isPlaying ? 'fa-pause' : 'fa-play'}"></i>`;
+    const icoEl = document.getElementById('icoFsPlayPause');
+    const lblEl = document.getElementById('lblFsPlayPause');
+    if (icoEl) {
+      icoEl.className = `fa-solid ${isPlaying ? 'fa-pause' : 'fa-play'}`;
+    }
+    if (lblEl) {
+      lblEl.textContent = isPlaying ? 'PAUSE' : 'LECTURE';
     }
 
     if (!isScrubbingFs) {
@@ -3356,8 +3396,15 @@
 
     // Full-Screen Motion Preview & Timeline Modal Controls
     document.getElementById('btnOpenFsPreview')?.addEventListener('click', openFsPreviewModal);
-    document.getElementById('btnCloseFsPreview')?.addEventListener('click', closeFsPreviewModal);
-    document.getElementById('fsPreviewBackdrop')?.addEventListener('click', closeFsPreviewModal);
+    document.getElementById('btnCloseFsPreview')?.addEventListener('click', () => closeFsPreviewModal(false));
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && isFsPreviewOpen() && !(window.electronAPI && window.electronAPI.isElectron)) {
+        closeFsPreviewModal(true);
+      } else if (isFsPreviewOpen()) {
+        fitViewport('fsViewport', 'fsScaler');
+      }
+    });
 
     document.getElementById('btnFsPlayPause')?.addEventListener('click', () => {
       if (!fsTimelineData?.tl) return;
@@ -3459,11 +3506,15 @@
 
     const fsScaler = document.getElementById('fsScaler');
     const btnFsCycleBg = document.getElementById('btnFsCycleBg');
+    const lblFsBgMode = document.getElementById('lblFsBgMode');
     if (btnFsCycleBg && fsScaler) {
       btnFsCycleBg.addEventListener('click', () => {
-        fsScaler.classList.remove(...bgModes);
-        fsBgIdx = (fsBgIdx + 1) % bgModes.length;
-        fsScaler.classList.add(bgModes[fsBgIdx]);
+        fsScaler.classList.remove(...fsBgModes);
+        fsBgIdx = (fsBgIdx + 1) % fsBgModes.length;
+        fsScaler.classList.add(fsBgModes[fsBgIdx]);
+        if (lblFsBgMode) {
+          lblFsBgMode.textContent = fsBgLabels[fsBgIdx];
+        }
       });
     }
 
@@ -3811,6 +3862,11 @@
               break;
             case 'open-fs-preview':
               openFsPreviewModal();
+              break;
+            case 'exited-fullscreen':
+              if (isFsPreviewOpen()) {
+                closeFsPreviewModal(true);
+              }
               break;
             case 'open-profiles':
               openProfilesModal();

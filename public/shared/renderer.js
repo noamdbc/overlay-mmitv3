@@ -806,13 +806,21 @@
       const elasticOut = `elastic.out(${(1.05 * Math.min(1.5, bounce)).toFixed(2)}, ${Math.max(0.28, (0.48 / bounce)).toFixed(2)})`;
 
       const tl = gsap.timeline({
-        defaults: { overwrite: 'auto' },
+        defaults: { overwrite: false },
         onComplete: () => {
           this.startDecorIdleLoop(el, gsap);
           if (onComplete) onComplete();
         }
       });
       this.tl = tl;
+
+      const decorLayer = el.querySelector('.ov-decor-layer');
+      if (rig) tl.set(rig, { x: 0, y: 0, scale: 1, scaleX: 1, scaleY: 1, skewX: 0, rotation: 0, rotationX: 0 }, 0);
+      if (pText) tl.set(pText, { x: 0, y: 0, yPercent: 0, scale: 1 }, 0);
+      if (sText) tl.set(sText, { x: 0, y: 0, yPercent: 0, scale: 1 }, 0);
+      if (secondaryPlate) tl.set(secondaryPlate, { x: 0, y: 0, scale: 1, scaleX: 1, rotationX: 0 }, 0);
+      if (tag) tl.set(tag, { x: 0, y: 0, yPercent: 0, scale: 1, rotationX: 0 }, 0);
+      if (decorLayer) tl.set(decorLayer, { scale: 1, y: 0 }, 0);
 
       const clipClosed =
         align === 'center'
@@ -1166,6 +1174,9 @@
       const holdDuration = Math.max(0.3, Number(holdSec) || 1.5);
       const outStart = inDuration + holdDuration;
 
+      // Advance playhead to end of IN so all elements are in their exact ON AIR resting state
+      tl.progress(1, true);
+
       const speed = Math.min(2.2, Math.max(0.4, Number(asset?.animSpeed) || 1));
       const dir = ['bottom', 'left', 'right', 'top', 'scale'].includes(asset?.animDirection)
         ? asset.animDirection
@@ -1178,6 +1189,13 @@
       const decorLayer = el.querySelector('.ov-decor-layer');
       const layout = rig?.dataset.layout || 'layered';
       const travel = this.getOffscreenTravel(el, asset);
+
+      if (rig) tl.set(rig, { x: 0, y: 0, scale: 1, scaleX: 1, scaleY: 1, skewX: 0, rotation: 0, rotationX: 0 }, inDuration);
+      if (pText) tl.set(pText, { x: 0, y: 0, yPercent: 0, scale: 1 }, inDuration);
+      if (sText) tl.set(sText, { x: 0, y: 0, yPercent: 0, scale: 1 }, inDuration);
+      if (secondaryPlate) tl.set(secondaryPlate, { x: 0, y: 0, scale: 1, scaleX: 1, rotationX: 0 }, inDuration);
+      if (tag) tl.set(tag, { x: 0, y: 0, yPercent: 0, scale: 1, rotationX: 0 }, inDuration);
+      if (decorLayer) tl.set(decorLayer, { scale: 1, y: 0 }, inDuration);
 
       if (decorLayer) {
         tl.fromTo(
@@ -1222,46 +1240,53 @@
 
       if (dir === 'left' || dir === 'right') {
         const outX = dir === 'right' ? travel.x : -travel.x;
+        const preX = dir === 'right' ? -12 : 12;
         tl.fromTo(
           rig,
           { x: 0, skewX: 0 },
-          { x: dir === 'right' ? -12 : 12, duration: 0.1 * speed, ease: 'power2.out', immediateRender: false },
+          { x: preX, skewX: 0, duration: 0.1 * speed, ease: 'power2.out', immediateRender: false },
           outStart
         );
-        tl.to(
+        tl.fromTo(
           rig,
-          { x: outX, skewX: dir === 'right' ? -14 : 14, duration: 0.34 * speed, ease: 'power3.in' },
+          { x: preX, skewX: 0 },
+          { x: outX, skewX: dir === 'right' ? -14 : 14, duration: 0.34 * speed, ease: 'power3.in', immediateRender: false },
           outStart + 0.1 * speed
         );
       } else if (dir === 'scale') {
         tl.fromTo(
           rig,
           { scale: 1, y: 0 },
-          { scale: 1.06, duration: 0.1 * speed, ease: 'power2.out', immediateRender: false },
+          { scale: 1.06, y: 0, duration: 0.1 * speed, ease: 'power2.out', immediateRender: false },
           outStart
         );
-        tl.to(
+        tl.fromTo(
           rig,
-          { scale: 0, y: 40, duration: 0.32 * speed, ease: 'back.in(1.6)' },
+          { scale: 1.06, y: 0 },
+          { scale: 0, y: 40, duration: 0.32 * speed, ease: 'back.in(1.6)', immediateRender: false },
           outStart + 0.1 * speed
         );
       } else {
         const outY = dir === 'top' ? -travel.y : travel.y;
+        const preY = dir === 'top' ? 9 : -9;
         tl.fromTo(
           rig,
           { y: 0, scaleY: 1 },
-          { y: dir === 'top' ? 9 : -9, duration: 0.11 * speed, ease: 'power2.out', immediateRender: false },
+          { y: preY, scaleY: 1, duration: 0.11 * speed, ease: 'power2.out', immediateRender: false },
           outStart
         );
-        tl.to(
+        tl.fromTo(
           rig,
-          { y: outY, scaleY: 1.04, duration: 0.34 * speed, ease: 'power3.in' },
+          { y: preY, scaleY: 1 },
+          { y: outY, scaleY: 1.04, duration: 0.34 * speed, ease: 'power3.in', immediateRender: false },
           outStart + 0.11 * speed
         );
       }
 
       const totalDuration = tl.duration();
       const outDuration = Math.max(0.15, totalDuration - outStart);
+
+      tl.progress(0, true);
 
       return {
         tl,
