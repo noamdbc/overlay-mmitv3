@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0">
+  <title>Export Renderer 1920x1080</title>
+  <link rel="stylesheet" href="/vendor/fonts/all-fonts.css">
+  <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="/shared/overlay-render.css">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent !important;
+      background-color: rgba(0, 0, 0, 0) !important;
+    }
+    #stage {
+      width: 1920px;
+      height: 1080px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: transparent !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage" class="ov-stage"></div>
+
+  <script src="/vendor/gsap/gsap.min.js"></script>
+  <script src="/shared/renderer.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      const stage = document.getElementById('stage');
+      const renderer = new window.OverlayRenderer(stage);
+
+      let exportTimelineData = null;
+      let exportFps = 50;
+      let totalFrames = 0;
+
+      window.prepareExport = function (asset, holdSec, fps) {
+        exportFps = Number(fps) || 50;
+        const hold = Math.max(0.5, Math.min(60, Number(holdSec) || 3));
+        exportTimelineData = renderer.buildFullCycleTimeline(asset, hold);
+        if (!exportTimelineData || !exportTimelineData.tl) {
+          return { ok: false, error: 'Timeline generation failed' };
+        }
+        exportTimelineData.tl.pause(0);
+        const duration = exportTimelineData.totalDuration;
+        totalFrames = Math.max(1, Math.ceil(duration * exportFps));
+
+        return {
+          ok: true,
+          totalDuration: duration,
+          inDuration: exportTimelineData.inDuration,
+          holdDuration: exportTimelineData.holdDuration,
+          outDuration: exportTimelineData.outDuration,
+          totalFrames: totalFrames,
+          fps: exportFps
+        };
+      };
+
+      window.seekFrame = function (frameIdx) {
+        if (!exportTimelineData || !exportTimelineData.tl) return false;
+        const time = Math.min(exportTimelineData.totalDuration, Math.max(0, frameIdx / exportFps));
+        exportTimelineData.tl.pause(time);
+        return true;
+      };
+
+      window.cleanupExport = function () {
+        if (exportTimelineData?.tl) {
+          exportTimelineData.tl.kill();
+        }
+        exportTimelineData = null;
+        renderer.cut();
+      };
+    })();
+  </script>
+</body>
+</html>

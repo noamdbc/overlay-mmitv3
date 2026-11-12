@@ -635,6 +635,154 @@ ipcMain.handle('app:open-data-folder', () => {
   return { ok: true };
 });
 
+ipcMain.handle('app:show-item-in-folder', (_event, filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    shell.showItemInFolder(filePath);
+  }
+  return { ok: true };
+});
+
+ipcMain.handle('app:save-file-dialog', async (_event, defaultName) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { canceled: true };
+  return await dialog.showSaveDialog(mainWindow, {
+    title: 'Enregistrer la vidéo avec canal Alpha (.mov)',
+    defaultPath: defaultName || 'overlay_alpha.mov',
+    filters: [{ name: 'QuickTime Movie avec Alpha (.mov)', extensions: ['mov'] }]
+  });
+});
+
+ipcMain.handle('app:export-video-mov', async (_event, { asset, holdDuration, fps, codec }) => {
+  try {
+    const result = await renderAssetToMov(asset, { holdDuration, fps, codec }, (prog) => {
+      if (serverModule && serverModule.io) {
+        serverModule.io.emit('export:progress', prog);
+      }
+    });
+    return { ok: true, ...result };
+  } catch (err) {
+    console.error('[Electron Video Export] Error:', err);
+    return { ok: false, error: err.message };
+  }
+});
+
+// Offscreen 1920x1080 Transparent Renderer Engine
+async function renderAssetToMov(asset, options = {}, onProgress) {
+  const { holdDuration = 3, fps = 50, codec = 'prores' } = options;
+  if (!serverModule) {
+    throw new Error('Serveur non initialisé');
+  }
+
+  const ffmpegPath = serverModule.findFFmpegBinary();
+  if (!ffmpegPath) {
+    throw new Error('FFmpeg introuvable sur le système. Veuillez installer FFmpeg pour exporter en .MOV.');
+  }
+
+  const { spawn } = require('child_process');
+  const os = require('os');
+  const exportUrl = `http://localhost:${serverModule.PORT}/export-render.html`;
+
+  const exportWin = new BrowserWindow({
+    width: 1920,
+    height: 1080,
+    show: false,
+    transparent: true,
+    frame: false,
+    webPreferences: {
+      offscreen: true
+    }
+  });
+
+  try {
+    await exportWin.loadURL(exportUrl);
+    await exportWin.webContents.executeJavaScript('document.fonts.ready');
+
+    const specs = await exportWin.webContents.executeJavaScript(
+      `window.prepareExport(${JSON.stringify(asset)}, ${Number(holdDuration) || 3}, ${Number(fps) || 50})`
+    );
+
+    if (!specs || !specs.ok) {
+      throw new Error(specs?.error || 'Échec de préparation de la timeline');
+    }
+
+    const totalFrames = specs.totalFrames;
+    const tmpDir = os.tmpdir();
+    const slug = (asset.primaryText || 'overlay')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'overlay';
+    const filename = `${slug}_alpha_${Date.now()}.mov`;
+    const outputPath = path.join(tmpDir, filename);
+
+    const isQtrle = codec === 'qtrle';
+    const isPng = codec === 'png';
+    const codecArgs = isQtrle
+      ? ['-c:v', 'qtrle']
+      : isPng
+      ? ['-c:v', 'png', '-pix_fmt', 'rgba']
+      : ['-c:v', 'prores_ks', '-profile:v', '4', '-pix_fmt', 'yuva444p10le'];
+
+    const ffArgs = [
+      '-y',
+      '-f', 'image2pipe',
+      '-vcodec', 'png',
+      '-r', String(fps),
+      '-i', '-',
+      ...codecArgs,
+      outputPath
+    ];
+
+    const ffProc = spawn(ffmpegPath, ffArgs);
+    let ffError = '';
+    ffProc.stderr.on('data', (d) => { ffError += d.toString(); });
+
+    for (let f = 0; f < totalFrames; f++) {
+      await exportWin.webContents.executeJavaScript(`window.seekFrame(${f})`);
+      const img = await exportWin.webContents.capturePage({ x: 0, y: 0, width: 1920, height: 1080 });
+      const pngBuf = img.toPNG();
+
+      const canWrite = ffProc.stdin.write(pngBuf);
+      if (!canWrite) {
+        await new Promise((resolve) => ffProc.stdin.once('drain', resolve));
+      }
+
+      if (typeof onProgress === 'function') {
+        const percent = Math.min(99, Math.round(((f + 1) / totalFrames) * 100));
+        onProgress({
+          currentFrame: f + 1,
+          totalFrames,
+          percent,
+          totalDuration: specs.totalDuration
+        });
+      }
+    }
+
+    ffProc.stdin.end();
+
+    await new Promise((resolve, reject) => {
+      ffProc.on('close', (code) => {
+        if (code === 0 && fs.existsSync(outputPath)) {
+          resolve(outputPath);
+        } else {
+          reject(new Error(`FFmpeg a échoué (code ${code}): ${ffError.slice(-300)}`));
+        }
+      });
+      ffProc.on('error', reject);
+    });
+
+    return {
+      outputPath,
+      filename,
+      totalFrames,
+      totalDuration: specs.totalDuration,
+      sizeBytes: fs.statSync(outputPath).size
+    };
+  } finally {
+    if (!exportWin.isDestroyed()) {
+      exportWin.destroy();
+    }
+  }
+}
+
 ipcMain.handle('app:open-external', (_event, url) => {
   if (url && /^https?:\/\//i.test(url)) {
     shell.openExternal(url);
@@ -650,6 +798,11 @@ ipcMain.handle('app:quit', () => {
 
 app.whenReady().then(() => {
   serverModule = require('../server.js');
+
+  // Register the Electron offscreen video export engine into serverModule
+  if (serverModule && typeof serverModule.registerExportHandler === 'function') {
+    serverModule.registerExportHandler(renderAssetToMov);
+  }
 
   // Keep Tray icon & Tally state updated whenever airState changes
   if (serverModule && serverModule.io) {

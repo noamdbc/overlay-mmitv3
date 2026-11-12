@@ -92,39 +92,89 @@
 
       <!-- LEFT: UNIFIED ASSETS LIBRARY / RUNDOWN -->
       <aside id="panelLeft" class="panel panel-assets">
-        <div class="panel-head">
-          <div class="panel-top-row">
-            <div class="filter-tabs" role="tablist">
-              <button class="filter-tab active" data-filter="all">Tous</button>
-              <button class="filter-tab" data-filter="synthe">Synthés</button>
-              <button class="filter-tab" data-filter="titre">Titres</button>
+        <!-- TOP VIEW MODE SWITCHER (ASSETS & DOSSIERS vs CONDUCTEUR) -->
+        <div class="left-panel-mode-switcher">
+          <button type="button" id="btnTabAssets" class="left-mode-btn active" title="Bibliothèque d'assets et dossiers">
+            <i class="fa-solid fa-boxes-stacked"></i> <span>Assets</span>
+            <span id="assetsTotalCountBadge" class="left-mode-count">0</span>
+          </button>
+          <button type="button" id="btnTabRundown" class="left-mode-btn" title="Conducteur d'émission séquentiel (Next Cue)">
+            <i class="fa-solid fa-list-check"></i> <span>Conducteur</span>
+            <span id="rundownTotalCountBadge" class="left-mode-count">0</span>
+          </button>
+          <button type="button" id="btnCollapseLeft" class="btn-fold-panel" title="Replier le volet (Cmd/Ctrl+1)">
+            <i class="fa-solid fa-angles-left"></i>
+          </button>
+        </div>
+
+        <!-- VIEW 1: ASSETS & FOLDERS LIST -->
+        <div id="viewAssets" class="left-view-panel">
+          <div class="panel-head">
+            <div class="panel-top-row">
+              <div class="filter-tabs" role="tablist">
+                <button class="filter-tab active" data-filter="all">Tous</button>
+                <button class="filter-tab" data-filter="synthe">Synthés</button>
+                <button class="filter-tab" data-filter="titre">Titres</button>
+              </div>
             </div>
-            <button type="button" id="btnCollapseLeft" class="btn-fold-panel" title="Replier le volet Assets (Cmd/Ctrl+1)">
-              <i class="fa-solid fa-angles-left"></i>
+            <div class="create-btns">
+              <button id="btnNewSynthe" class="btn-add" title="Nouveau Synthé (Bas-Gauche)">
+                <i class="fa-solid fa-plus"></i> Synthé
+              </button>
+              <button id="btnNewTitre" class="btn-add btn-add-alt" title="Nouveau Titre (Bas-Centre)">
+                <i class="fa-solid fa-plus"></i> Titre
+              </button>
+              <button id="btnNewFolder" class="btn-add btn-add-folder" title="Nouveau Dossier d'Assets">
+                <i class="fa-solid fa-folder-plus"></i> Dossier
+              </button>
+            </div>
+            <button id="btnOpenGallerySide" class="btn-gallery-side">
+              <i class="fa-solid fa-layer-group"></i> Explorer la Galerie de Templates (36+)
             </button>
           </div>
-          <div class="create-btns">
-            <button id="btnNewSynthe" class="btn-add" title="Nouveau Synthé (Bas-Gauche)">
-              <i class="fa-solid fa-plus"></i> Synthé
-            </button>
-            <button id="btnNewTitre" class="btn-add btn-add-alt" title="Nouveau Titre (Bas-Centre)">
-              <i class="fa-solid fa-plus"></i> Titre
+
+          <div class="search-bar">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="searchInput" placeholder="Filtrer les assets..." autocomplete="off">
+            <button id="btnClearSearch" class="btn-clear-search hidden" title="Effacer">
+              <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
-          <button id="btnOpenGallerySide" class="btn-gallery-side">
-            <i class="fa-solid fa-layer-group"></i> Explorer la Galerie de Templates (36+)
-          </button>
+
+          <div id="assetList" class="asset-list"></div>
         </div>
 
-        <div class="search-bar">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="searchInput" placeholder="Filtrer..." autocomplete="off">
-          <button id="btnClearSearch" class="btn-clear-search hidden" title="Effacer">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
+        <!-- VIEW 2: CONDUCTEUR D'ÉMISSION (RUNDOWN / NEXT CUE) -->
+        <div id="viewRundown" class="left-view-panel hidden">
+          <div class="rundown-master-bar">
+            <button type="button" id="btnRundownNext" class="btn-broadcast btn-rundown-master" title="Envoyer le cue suivant (Raccourci : Espace / Stream Deck)">
+              <div class="btn-rnd-icon">
+                <i id="icoRundownMaster" class="fa-solid fa-forward-step"></i>
+              </div>
+              <div class="btn-rnd-texts">
+                <span id="lblRundownMasterTitle" class="btn-rnd-title">NEXT CUE</span>
+                <span id="lblRundownMasterSub" class="btn-rnd-sub">Prêt : Aucun cue</span>
+              </div>
+            </button>
+          </div>
 
-        <div id="assetList" class="asset-list"></div>
+          <div class="rundown-tools-bar">
+            <button type="button" id="btnRundownReset" class="btn-tool" title="Revenir au tout début du conducteur (Cue #1)">
+              <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+            </button>
+            <button type="button" id="btnRundownAddDraft" class="btn-tool" title="Ajouter l'asset en cours d'édition à la fin du conducteur">
+              <i class="fa-solid fa-plus"></i> + Asset
+            </button>
+            <button type="button" id="btnRundownAddAll" class="btn-tool" title="Ajouter tous les assets du profil au conducteur">
+              <i class="fa-solid fa-layer-group"></i> + Tout
+            </button>
+            <button type="button" id="btnRundownClear" class="btn-tool btn-tool-danger" title="Vider tous les cues du conducteur">
+              <i class="fa-regular fa-trash-can"></i> Vider
+            </button>
+          </div>
+
+          <div id="rundownListContainer" class="rundown-list"></div>
+        </div>
       </aside>
 
       <!-- LEFT DRAGGABLE RESIZER -->
@@ -242,6 +292,9 @@
             </button>
             <button id="btnDuplicate" class="btn-sec" title="Dupliquer cet asset (Ctrl+D)">
               <i class="fa-regular fa-clone"></i> Dupliquer
+            </button>
+            <button id="btnExportMov" class="btn-sec btn-export-mov" title="Exporter l'animation en vidéo QuickTime avec canal Alpha (.mov)">
+              <i class="fa-solid fa-file-video"></i> Exporter .MOV Alpha
             </button>
             <button id="btnSave" class="btn-sec btn-save" title="Enregistrer dans la liste (Ctrl+S)">
               <i class="fa-solid fa-floppy-disk"></i> <span id="saveBtnLabel">Enregistrer</span>
@@ -956,6 +1009,19 @@
 
           <div id="updateStatusBox" class="update-status-box">
             <span id="updateStatusText">Cliquez sur « Vérifier les mises à jour » pour interroger GitHub Releases.</span>
+            <div id="settingsUpdateProgress" class="update-progress-box hidden">
+              <div class="update-progress-head">
+                <span id="settingsUpdateProgressMsg" class="update-progress-msg">Téléchargement en cours...</span>
+                <span id="settingsUpdateProgressPct" class="update-progress-pct">0%</span>
+              </div>
+              <div class="update-progress-bar">
+                <div id="settingsUpdateProgressBarFill" class="update-progress-fill" style="width: 0%"></div>
+              </div>
+              <div class="update-progress-meta">
+                <span id="settingsUpdateProgressBytes">0 Mo / 0 Mo</span>
+                <span id="settingsUpdateProgressSpeed">-- Mo/s</span>
+              </div>
+            </div>
             <div id="updateDownloadLinks" class="settings-btn-row hidden"></div>
           </div>
 
@@ -1013,6 +1079,19 @@
         Voulez-vous télécharger la mise à jour (ainsi que le plugin Stream Deck associé) maintenant ?
       </p>
       <div id="updPromptNotes" class="upd-prompt-notes hidden"></div>
+      <div id="promptUpdateProgress" class="update-progress-box hidden">
+        <div class="update-progress-head">
+          <span id="promptUpdateProgressMsg" class="update-progress-msg">Téléchargement en cours...</span>
+          <span id="promptUpdateProgressPct" class="update-progress-pct">0%</span>
+        </div>
+        <div class="update-progress-bar">
+          <div id="promptUpdateProgressBarFill" class="update-progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="update-progress-meta">
+          <span id="promptUpdateProgressBytes">0 Mo / 0 Mo</span>
+          <span id="promptUpdateProgressSpeed">-- Mo/s</span>
+        </div>
+      </div>
       <div class="unsaved-actions">
         <button type="button" id="btnUpdPromptAutoInstall" class="btn-broadcast btn-take">
           <i class="fa-solid fa-bolt"></i> <span id="updPromptAutoInstallLabel">Installer & Redémarrer automatiquement</span>
@@ -1044,6 +1123,9 @@
         </button>
         <button type="button" id="btnFsCycleBg" class="btn-sec" title="Changer le fond (Noir pur / Damier / Studio)">
           <i class="fa-solid fa-circle-half-stroke"></i> <span id="lblFsBgMode">Fond : Noir pur</span>
+        </button>
+        <button type="button" id="btnFsExportMov" class="btn-sec" title="Exporter cette animation en vidéo QuickTime avec canal Alpha (.mov)">
+          <i class="fa-solid fa-file-video"></i> <span>Export .MOV</span>
         </button>
         <button type="button" id="btnFsTakeAir" class="btn-broadcast btn-take" title="Envoyer cet asset directement à l'antenne">
           <i class="fa-solid fa-play"></i> <span>ENVOYER EN DIRECT</span>
@@ -1124,6 +1206,168 @@
         </select>
         <button type="button" id="btnFsLoop" class="btn-sec btn-icon-sq active" title="Lecture en boucle continue">
           <i class="fa-solid fa-repeat"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GESTION DOSSIER D'ASSETS -->
+  <div id="folderModal" class="gallery-modal hidden" role="dialog" aria-modal="true">
+    <div class="gallery-backdrop" id="folderModalBackdrop"></div>
+    <div class="unsaved-dialog folder-modal-dialog">
+      <div class="unsaved-icon-wrap" id="folderModalIconWrap" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">
+        <i class="fa-solid fa-folder"></i>
+      </div>
+      <h3 class="unsaved-title" id="folderModalTitle">Nouveau Dossier d'Assets</h3>
+      <p class="unsaved-desc">Organisez vos synthés et titres dans des catégories ordonnées.</p>
+      
+      <div class="folder-form-body">
+        <div class="f-group">
+          <label for="txtFolderName">Nom du dossier</label>
+          <input type="text" id="txtFolderName" class="inp" placeholder="Ex: Invités, Chroniques, Sport..." maxlength="40">
+        </div>
+
+        <div class="f-group">
+          <label>Couleur du dossier</label>
+          <div class="folder-color-swatches" id="folderColorSwatches">
+            <button type="button" class="swatch-btn active" data-color="#3b82f6" style="--c:#3b82f6;" title="Bleu"></button>
+            <button type="button" class="swatch-btn" data-color="#10b981" style="--c:#10b981;" title="Émeraude"></button>
+            <button type="button" class="swatch-btn" data-color="#f59e0b" style="--c:#f59e0b;" title="Ambre"></button>
+            <button type="button" class="swatch-btn" data-color="#ef4444" style="--c:#ef4444;" title="Rouge"></button>
+            <button type="button" class="swatch-btn" data-color="#8b5cf6" style="--c:#8b5cf6;" title="Violet"></button>
+            <button type="button" class="swatch-btn" data-color="#ec4899" style="--c:#ec4899;" title="Rose"></button>
+            <button type="button" class="swatch-btn" data-color="#06b6d4" style="--c:#06b6d4;" title="Cyan"></button>
+            <button type="button" class="swatch-btn" data-color="#64748b" style="--c:#64748b;" title="Gris"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="unsaved-actions">
+        <button type="button" id="btnFolderModalSubmit" class="btn-broadcast btn-take">
+          <i class="fa-solid fa-check"></i> <span id="btnFolderModalSubmitLabel">Créer le dossier</span>
+        </button>
+        <button type="button" id="btnFolderModalCancel" class="btn-sec">
+          Annuler
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EXPORT VIDÉO QUICKTIME .MOV (CANAL ALPHA PRORES / RLE) -->
+  <div id="exportVideoModal" class="gallery-modal hidden" role="dialog" aria-modal="true">
+    <div class="gallery-backdrop" id="exportVideoBackdrop"></div>
+    <div class="unsaved-dialog export-video-dialog">
+      <div class="unsaved-icon-wrap" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa;">
+        <i class="fa-solid fa-file-video"></i>
+      </div>
+      <h3 class="unsaved-title">Export Vidéo QuickTime avec Canal Alpha (.MOV)</h3>
+      <p class="unsaved-desc">Générez un clip vidéo 1080p transparent autonome avec l'animation d'entrée, de maintien et de sortie, prêt pour vMix, OBS, Premiere Pro, DaVinci Resolve ou Final Cut Pro.</p>
+
+      <div class="export-settings-form" id="exportSettingsForm">
+        <div class="export-asset-summary">
+          <div class="export-asset-thumb" id="exportAssetThumb">
+            <i class="fa-solid fa-play"></i>
+          </div>
+          <div class="export-asset-info">
+            <strong id="exportAssetTitle">Titre de l'asset</strong>
+            <span id="exportAssetMeta">Synthé • 1920×1080</span>
+          </div>
+        </div>
+
+        <div class="export-grid-fields">
+          <div class="f-group">
+            <label for="exportHoldSec">
+              <span>Durée de maintien à l'antenne</span>
+              <strong id="exportHoldSecVal" class="field-val">4.0 s</strong>
+            </label>
+            <input type="range" id="exportHoldSec" class="inp-range" min="1" max="30" step="0.5" value="4">
+            <span class="field-hint">Durée entre la fin de l'entrée et le début de la sortie.</span>
+          </div>
+
+          <div class="f-group">
+            <label for="exportFps">Cadence d'images (FPS)</label>
+            <select id="exportFps" class="inp-select">
+              <option value="50" selected>50 fps (Standard Broadcast TV / vMix)</option>
+              <option value="60">60 fps (Fluide Web / Esports)</option>
+              <option value="25">25 fps (Standard Cinéma / TV 25p)</option>
+              <option value="30">30 fps (Web 30p)</option>
+            </select>
+          </div>
+
+          <div class="f-group">
+            <label for="exportCodec">Codec vidéo Alpha</label>
+            <select id="exportCodec" class="inp-select">
+              <option value="prores" selected>Apple ProRes 4444 (Transparence 10-bit, qualité studio)</option>
+              <option value="qtrle">QuickTime Animation RLE (Transparence 8-bit universelle)</option>
+            </select>
+          </div>
+
+          <div class="export-calc-box">
+            <div class="calc-row">
+              <span>Animation d'entrée :</span>
+              <strong id="exportCalcIn">0.60 s</strong>
+            </div>
+            <div class="calc-row">
+              <span>Maintien (On Air) :</span>
+              <strong id="exportCalcHold">4.00 s</strong>
+            </div>
+            <div class="calc-row">
+              <span>Animation de sortie :</span>
+              <strong id="exportCalcOut">0.50 s</strong>
+            </div>
+            <div class="calc-row calc-total">
+              <span>Durée totale du clip :</span>
+              <strong id="exportCalcTotal">5.10 s (255 images @ 50 fps)</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROGRESS TRACKER SECTION -->
+      <div id="exportProgressSection" class="export-progress-section hidden">
+        <div class="export-progress-header">
+          <div class="export-spinner-icon">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+          </div>
+          <div class="export-progress-titles">
+            <strong id="exportProgressStatusTitle">Rendu des images transparentes...</strong>
+            <span id="exportProgressStatusSub">Initialisation du moteur de rendu...</span>
+          </div>
+          <span id="exportProgressPercent" class="export-progress-pct">0%</span>
+        </div>
+
+        <div class="update-progress-bar export-progress-bar">
+          <div id="exportProgressBarFill" class="update-progress-fill" style="width: 0%"></div>
+        </div>
+
+        <div class="export-stats-row">
+          <span><i class="fa-solid fa-film"></i> <span id="exportStatFrames">0 / 0 images</span></span>
+          <span><i class="fa-regular fa-clock"></i> <span id="exportStatTime">0.0s</span></span>
+          <span><i class="fa-solid fa-gauge-high"></i> <span id="exportStatSpeed">-- fps</span></span>
+        </div>
+      </div>
+
+      <!-- RESULT SECTION -->
+      <div id="exportResultSection" class="export-result-section hidden">
+        <div class="export-result-success">
+          <i class="fa-solid fa-circle-check"></i>
+          <h4>Exportation terminée avec succès !</h4>
+          <p id="exportResultFilePath" class="export-result-path">/chemin/vers/fichier.mov</p>
+        </div>
+      </div>
+
+      <div class="unsaved-actions">
+        <button type="button" id="btnStartExportVideo" class="btn-broadcast btn-take">
+          <i class="fa-solid fa-play"></i> <span>Lancer l'exportation .MOV</span>
+        </button>
+        <button type="button" id="btnRevealExportFile" class="btn-broadcast btn-take hidden">
+          <i class="fa-solid fa-folder-open"></i> <span>Afficher dans le dossier</span>
+        </button>
+        <a id="btnDownloadExportFile" href="#" download class="btn-broadcast btn-take hidden">
+          <i class="fa-solid fa-download"></i> <span>Télécharger le fichier .MOV</span>
+        </a>
+        <button type="button" id="btnCancelExportVideo" class="btn-sec">
+          Fermer
         </button>
       </div>
     </div>

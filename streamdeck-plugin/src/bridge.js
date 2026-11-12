@@ -21,6 +21,15 @@ export class OverlayBridge {
       autoHideAt: null,
       autoDurationMs: null
     };
+    this.rundownState = {
+      items: [],
+      currentIndex: -1,
+      nextIndex: 0,
+      activeCueId: null,
+      state: 'READY',
+      currentCue: null,
+      nextCue: null
+    };
     this.clockOffsetMs = 0;
     this.tickInterval = null;
 
@@ -127,6 +136,12 @@ export class OverlayBridge {
       this.syncTicker();
       this.notifyState();
     });
+
+    this.socket.on('rundown:state', (state) => {
+      if (!state) return;
+      this.rundownState = state;
+      this.notifyState();
+    });
   }
 
   getNowServer() {
@@ -217,6 +232,12 @@ export class OverlayBridge {
     return true;
   }
 
+  triggerRundownNext() {
+    if (!this.socket || !this.connected || this.versionMismatch) return false;
+    this.socket.emit('rundown:next');
+    return true;
+  }
+
   switchProfile(profileId) {
     if (!this.socket || !this.connected || this.versionMismatch || !profileId) return false;
     this.socket.emit('profile:switch', profileId);
@@ -234,7 +255,8 @@ export class OverlayBridge {
       assets: this.assets,
       profiles: this.profiles,
       activeProfileId: this.activeProfileId,
-      airState: this.airState
+      airState: this.airState,
+      rundownState: this.rundownState
     };
   }
 }

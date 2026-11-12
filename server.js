@@ -399,6 +399,7 @@ function normalizeAsset(raw = {}) {
 
   return {
     id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : makeId(),
+    folderId: typeof raw.folderId === 'string' && raw.folderId.trim() ? raw.folderId.trim() : null,
     kind,
     primaryText: typeof raw.primaryText === 'string' ? raw.primaryText : 'Sans titre',
     secondaryText: typeof raw.secondaryText === 'string' ? raw.secondaryText : '',
@@ -457,6 +458,32 @@ function normalizeAsset(raw = {}) {
   };
 }
 
+function normalizeFolder(raw = {}, index = 0) {
+  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : makeId('fld_');
+  const name =
+    typeof raw.name === 'string' && raw.name.trim()
+      ? raw.name.trim().slice(0, 50)
+      : `Dossier ${index + 1}`;
+  const color =
+    typeof raw.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(raw.color)
+      ? raw.color.toUpperCase()
+      : '#FAB001';
+  return {
+    id,
+    name,
+    color,
+    collapsed: Boolean(raw.collapsed)
+  };
+}
+
+function normalizeRundownItem(raw = {}) {
+  return {
+    id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : makeId('cue_'),
+    assetId: typeof raw.assetId === 'string' ? raw.assetId.trim() : '',
+    note: typeof raw.note === 'string' ? raw.note.trim().slice(0, 100) : ''
+  };
+}
+
 function normalizeProfile(raw = {}, index = 0) {
   const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : makeId('prf_');
   const name =
@@ -464,11 +491,15 @@ function normalizeProfile(raw = {}, index = 0) {
       ? raw.name.trim().slice(0, 60)
       : `Profil ${index + 1}`;
   const assets = Array.isArray(raw.assets) ? raw.assets.map(normalizeAsset) : [];
+  const folders = Array.isArray(raw.folders) ? raw.folders.map((f, i) => normalizeFolder(f, i)) : [];
+  const rundown = Array.isArray(raw.rundown) ? raw.rundown.map(normalizeRundownItem) : [];
   return {
     id,
     name,
     updatedAt: Number(raw.updatedAt) || Date.now(),
-    assets
+    folders,
+    assets,
+    rundown
   };
 }
 
@@ -482,7 +513,9 @@ function loadStore() {
         id: 'prf_default',
         name: 'Profil Principal',
         updatedAt: Date.now(),
-        assets: getDefaultPresets()
+        folders: [],
+        assets: getDefaultPresets(),
+        rundown: []
       };
       const initial = {
         activeProfileId: defProfile.id,
@@ -522,7 +555,9 @@ function loadStore() {
       id: 'prf_default',
       name: 'Profil Principal',
       updatedAt: Date.now(),
-      assets: getDefaultPresets()
+      folders: [],
+      assets: getDefaultPresets(),
+      rundown: []
     };
     return { activeProfileId: defProfile.id, profiles: [defProfile] };
   }
@@ -559,15 +594,87 @@ function setActiveAssets(nextAssets) {
 }
 
 function publicProfilesState() {
+  const active = getActiveProfile();
   return {
-    activeProfileId: getActiveProfile().id,
+    activeProfileId: active.id,
     profiles: store.profiles.map((p) => ({
       id: p.id,
       name: p.name,
       count: p.assets.length,
       updatedAt: p.updatedAt
-    }))
+    })),
+    folders: active.folders || []
   };
+}
+
+// =========================================================
+// Conducteur Runtime State (Rundown / Playlist / Cue System)
+// =========================================================
+const rundownRuntime = {
+  currentIndex: -1,
+  nextIndex: 0,
+  activeCueId: null,
+  state: 'READY' // 'READY' | 'ON_AIR' | 'EXITING' | 'OVERRIDDEN'
+};
+
+function publicRundownState() {
+  const profile = getActiveProfile();
+  const items = (profile.rundown || []).map((item, idx) => {
+    const asset = findAssetAcrossProfiles(item.assetId);
+    return {
+      id: item.id,
+      assetId: item.assetId,
+      note: item.note || '',
+      index: idx,
+      asset: asset
+        ? {
+            id: asset.id,
+            kind: asset.kind,
+            layout: asset.layout,
+            primaryText: asset.primaryText,
+            secondaryText: asset.secondaryText,
+            tagText: asset.tagText,
+            mode: asset.mode,
+            duration: asset.duration,
+            icon: asset.icon,
+            primaryBg: asset.primaryBg,
+            primaryColor: asset.primaryColor,
+            secondaryBg: asset.secondaryBg,
+            secondaryColor: asset.secondaryColor,
+            animStyle: asset.animStyle
+          }
+        : null
+    };
+  });
+
+  const nextIndex =
+    rundownRuntime.nextIndex >= 0 && rundownRuntime.nextIndex < items.length
+      ? rundownRuntime.nextIndex
+      : items.length > 0
+      ? 0
+      : -1;
+
+  const currentIndex =
+    rundownRuntime.currentIndex >= 0 && rundownRuntime.currentIndex < items.length
+      ? rundownRuntime.currentIndex
+      : -1;
+
+  const currentCue = currentIndex >= 0 ? items[currentIndex] : null;
+  const nextCue = nextIndex >= 0 ? items[nextIndex] : null;
+
+  return {
+    items,
+    currentIndex,
+    nextIndex,
+    activeCueId: rundownRuntime.activeCueId,
+    state: rundownRuntime.state,
+    currentCue,
+    nextCue
+  };
+}
+
+function broadcastRundownState() {
+  io.emit('rundown:state', publicRundownState());
 }
 
 function getLanAddresses() {
@@ -784,7 +891,7 @@ function checkGitHubRelease() {
   });
 }
 
-function downloadFileWithRedirects(url, destPath, maxRedirects = 6) {
+function downloadFileWithRedirects(url, destPath, onProgress, maxRedirects = 6) {
   return new Promise((resolve, reject) => {
     if (maxRedirects <= 0) {
       return reject(new Error('Trop de redirections HTTP'));
@@ -795,7 +902,7 @@ function downloadFileWithRedirects(url, destPath, maxRedirects = 6) {
         headers: {
           'User-Agent': `OverlayRegie/${APP_VERSION}`
         },
-        timeout: 60000
+        timeout: 120000
       },
       (res) => {
         if (
@@ -806,17 +913,50 @@ function downloadFileWithRedirects(url, destPath, maxRedirects = 6) {
         ) {
           res.resume();
           return resolve(
-            downloadFileWithRedirects(res.headers.location, destPath, maxRedirects - 1)
+            downloadFileWithRedirects(res.headers.location, destPath, onProgress, maxRedirects - 1)
           );
         }
         if (res.statusCode !== 200) {
           res.resume();
           return reject(new Error(`Statut téléchargement HTTP ${res.statusCode}`));
         }
+
+        const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+        let downloadedBytes = 0;
+        const startTime = Date.now();
+        let lastReport = 0;
+
         const fileStream = fs.createWriteStream(destPath);
+        res.on('data', (chunk) => {
+          downloadedBytes += chunk.length;
+          const now = Date.now();
+          if (typeof onProgress === 'function' && (now - lastReport > 120 || downloadedBytes === totalBytes)) {
+            lastReport = now;
+            const elapsedSec = Math.max(0.1, (now - startTime) / 1000);
+            const speedBytesPerSec = downloadedBytes / elapsedSec;
+            const percent = totalBytes > 0 ? Math.min(99, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+            onProgress({
+              downloadedBytes,
+              totalBytes,
+              percent,
+              speedBytesPerSec
+            });
+          }
+        });
+
         res.pipe(fileStream);
         fileStream.on('finish', () => {
-          fileStream.close(() => resolve(destPath));
+          fileStream.close(() => {
+            if (typeof onProgress === 'function') {
+              onProgress({
+                downloadedBytes,
+                totalBytes,
+                percent: 100,
+                speedBytesPerSec: 0
+              });
+            }
+            resolve(destPath);
+          });
         });
         fileStream.on('error', (err) => {
           fs.rmSync(destPath, { force: true });
@@ -874,7 +1014,25 @@ app.post('/api/install-update', async (_req, res) => {
       const dmgPath = path.join(tmpDir, `Overlay-Regie-v${release.latestVersion}.dmg`);
       const mountPoint = path.join(tmpDir, `overlay_regie_mnt_${Date.now()}`);
 
-      await downloadFileWithRedirects(dmgUrl, dmgPath);
+      await downloadFileWithRedirects(dmgUrl, dmgPath, (prog) => {
+        const mbDown = (prog.downloadedBytes / 1048576).toFixed(1);
+        const mbTot = (prog.totalBytes / 1048576).toFixed(1);
+        const speedMb = (prog.speedBytesPerSec / 1048576).toFixed(1);
+        io.emit('update:progress', {
+          step: 'downloading',
+          percent: prog.percent,
+          downloadedBytes: prog.downloadedBytes,
+          totalBytes: prog.totalBytes,
+          speed: `${speedMb} Mo/s`,
+          message: `Téléchargement : ${mbDown} / ${mbTot} Mo (${prog.percent}%) à ${speedMb} Mo/s`
+        });
+      });
+
+      io.emit('update:progress', {
+        step: 'installing',
+        percent: 94,
+        message: 'Vérification de l\'image disque et installation...'
+      });
 
       try {
         execFileSync('xattr', ['-cr', dmgPath]);
@@ -907,6 +1065,12 @@ app.post('/api/install-update', async (_req, res) => {
         fs.rmSync(dmgPath, { force: true });
       }
 
+      io.emit('update:progress', {
+        step: 'ready',
+        percent: 100,
+        message: 'Mise à jour installée dans /Applications ! Redémarrage...'
+      });
+
       res.json({
         ok: true,
         platform: 'darwin',
@@ -934,7 +1098,25 @@ app.post('/api/install-update', async (_req, res) => {
         return res.status(404).json({ ok: false, error: 'Aucun fichier .exe trouvé dans la release' });
       }
       const exePath = path.join(tmpDir, `Overlay-Regie-Setup-v${release.latestVersion}.exe`);
-      await downloadFileWithRedirects(exeUrl, exePath);
+      await downloadFileWithRedirects(exeUrl, exePath, (prog) => {
+        const mbDown = (prog.downloadedBytes / 1048576).toFixed(1);
+        const mbTot = (prog.totalBytes / 1048576).toFixed(1);
+        const speedMb = (prog.speedBytesPerSec / 1048576).toFixed(1);
+        io.emit('update:progress', {
+          step: 'downloading',
+          percent: prog.percent,
+          downloadedBytes: prog.downloadedBytes,
+          totalBytes: prog.totalBytes,
+          speed: `${speedMb} Mo/s`,
+          message: `Téléchargement : ${mbDown} / ${mbTot} Mo (${prog.percent}%) à ${speedMb} Mo/s`
+        });
+      });
+
+      io.emit('update:progress', {
+        step: 'ready',
+        percent: 100,
+        message: 'Installeur téléchargé ! Lancement de la mise à jour...'
+      });
 
       res.json({
         ok: true,
@@ -1013,6 +1195,144 @@ app.get('/api/export', (req, res) => {
 });
 
 // =========================================================
+// Video Export Engine (.MOV with Alpha — ProRes 4444 / QTRLE)
+// =========================================================
+let exportVideoHandler = null;
+
+function registerExportHandler(handler) {
+  exportVideoHandler = handler;
+}
+
+function findFFmpegBinary() {
+  const candidates = [
+    process.env.FFMPEG_PATH,
+    '/opt/homebrew/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    '/usr/bin/ffmpeg',
+    path.join(process.resourcesPath || '', 'bin', 'ffmpeg'),
+    path.join(process.resourcesPath || '', 'bin', 'ffmpeg.exe'),
+    'C:\\ffmpeg\\bin\\ffmpeg.exe'
+  ];
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
+  }
+  try {
+    const { execSync } = require('child_process');
+    const cmd = process.platform === 'win32' ? 'where ffmpeg' : 'which ffmpeg';
+    const out = execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim().split('\n')[0];
+    if (out && fs.existsSync(out)) return out;
+  } catch (_e) {}
+  return null;
+}
+
+app.get('/api/ffmpeg-status', (_req, res) => {
+  const bin = findFFmpegBinary();
+  res.json({
+    available: Boolean(bin),
+    path: bin,
+    hasHandler: typeof exportVideoHandler === 'function'
+  });
+});
+
+const exportJobs = new Map();
+
+app.post('/api/export-video', async (req, res) => {
+  const { asset, holdDuration = 3, fps = 50, codec = 'prores' } = req.body || {};
+  if (!asset) {
+    return res.status(400).json({ ok: false, error: 'Asset manquant' });
+  }
+
+  const ffmpegPath = findFFmpegBinary();
+  if (!ffmpegPath) {
+    return res.status(503).json({
+      ok: false,
+      error: 'FFmpeg est requis pour exporter en .MOV avec canal alpha. Veuillez installer FFmpeg (ex: brew install ffmpeg sur Mac, ou ffmpeg sous Windows).'
+    });
+  }
+
+  if (typeof exportVideoHandler !== 'function') {
+    return res.status(503).json({
+      ok: false,
+      error: 'Moteur de rendu d\'exportation indisponible. Utilisez l\'application bureau Electron.'
+    });
+  }
+
+  const jobId = 'job_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  exportJobs.set(jobId, {
+    id: jobId,
+    status: 'rendering',
+    percent: 0,
+    currentFrame: 0,
+    totalFrames: 0,
+    startedAt: Date.now()
+  });
+
+  res.json({ ok: true, jobId });
+
+  (async () => {
+    try {
+      const result = await exportVideoHandler(
+        asset,
+        { holdDuration: Number(holdDuration) || 3, fps: Number(fps) || 50, codec },
+        (prog) => {
+          const job = exportJobs.get(jobId);
+          if (job) {
+            job.percent = prog.percent;
+            job.currentFrame = prog.currentFrame;
+            job.totalFrames = prog.totalFrames;
+            job.totalDuration = prog.totalDuration;
+          }
+          io.emit('export:progress', { jobId, ...prog });
+        }
+      );
+
+      const job = exportJobs.get(jobId);
+      if (job) {
+        job.status = 'done';
+        job.percent = 100;
+        job.outputPath = result.outputPath;
+        job.filename = result.filename;
+        job.sizeBytes = result.sizeBytes;
+        job.downloadUrl = `/api/export-video/download/${jobId}`;
+      }
+
+      io.emit('export:done', {
+        jobId,
+        ok: true,
+        downloadUrl: `/api/export-video/download/${jobId}`,
+        filename: result.filename,
+        outputPath: result.outputPath,
+        sizeBytes: result.sizeBytes
+      });
+    } catch (err) {
+      console.error('[Export Video] Erreur:', err.message);
+      const job = exportJobs.get(jobId);
+      if (job) {
+        job.status = 'error';
+        job.error = err.message;
+      }
+      io.emit('export:error', { jobId, ok: false, error: err.message });
+    }
+  })();
+});
+
+app.get('/api/export-video/status/:jobId', (req, res) => {
+  const job = exportJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ ok: false, error: 'Tâche d\'export introuvable' });
+  }
+  res.json({ ok: true, job });
+});
+
+app.get('/api/export-video/download/:jobId', (req, res) => {
+  const job = exportJobs.get(req.params.jobId);
+  if (!job || job.status !== 'done' || !job.outputPath || !fs.existsSync(job.outputPath)) {
+    return res.status(404).send('Fichier introuvable ou export non terminé');
+  }
+  res.download(job.outputPath, job.filename);
+});
+
+// =========================================================
 // Broadcast State Machine — Strict Single-Asset Sequencing
 // =========================================================
 const airState = {
@@ -1077,6 +1397,43 @@ function broadcastAirState() {
 function broadcastAssets() {
   io.emit('profiles:state', publicProfilesState());
   io.emit('assets:list', getActiveAssets());
+  broadcastRundownState();
+}
+
+function triggerRundownNext() {
+  const profile = getActiveProfile();
+  const items = profile.rundown || [];
+  if (items.length === 0) return;
+
+  // Case 1: If current rundown cue is on air, pressing Next Cue initiates its exit
+  if (airState.phase === 'ON_AIR' && rundownRuntime.activeCueId) {
+    triggerOut();
+    return;
+  }
+
+  // Case 2: During transitions, ignore duplicate triggers
+  if (airState.phase === 'ENTERING' || airState.phase === 'EXITING') {
+    return;
+  }
+
+  // Case 3: Off air or overriding asset -> take the next cue in line
+  let targetIdx = rundownRuntime.nextIndex;
+  if (targetIdx < 0 || targetIdx >= items.length) {
+    targetIdx = 0;
+  }
+
+  const targetCue = items[targetIdx];
+  if (!targetCue) return;
+
+  const asset = findAssetAcrossProfiles(targetCue.assetId);
+  if (!asset) return;
+
+  rundownRuntime.currentIndex = targetIdx;
+  rundownRuntime.activeCueId = targetCue.id;
+  rundownRuntime.state = 'ON_AIR';
+
+  triggerTake(asset);
+  broadcastRundownState();
 }
 
 function countClientsByRole(role) {
@@ -1151,6 +1508,16 @@ function triggerTake(rawAsset, overrideMode) {
     mode: overrideMode === 'auto' || overrideMode === 'manual' ? overrideMode : rawAsset.mode
   });
 
+  // Track if this asset is external to the active rundown cue
+  if (rundownRuntime.activeCueId) {
+    const activeCue = (getActiveProfile().rundown || []).find((c) => c.id === rundownRuntime.activeCueId);
+    if (!activeCue || activeCue.assetId !== incoming.id) {
+      rundownRuntime.activeCueId = null;
+      rundownRuntime.state = 'OVERRIDDEN';
+      broadcastRundownState();
+    }
+  }
+
   if (airState.phase === 'IDLE' || !airState.currentAsset) {
     runEnter(incoming);
     return;
@@ -1191,6 +1558,20 @@ function triggerTake(rawAsset, overrideMode) {
       runEnter(next);
     } else {
       airState.phase = 'IDLE';
+      if (rundownRuntime.activeCueId) {
+        rundownRuntime.activeCueId = null;
+        const items = getActiveProfile().rundown || [];
+        if (rundownRuntime.currentIndex + 1 < items.length) {
+          rundownRuntime.nextIndex = rundownRuntime.currentIndex + 1;
+        } else {
+          rundownRuntime.nextIndex = -1;
+        }
+        rundownRuntime.state = rundownRuntime.nextIndex >= 0 ? 'READY' : 'IDLE';
+        broadcastRundownState();
+      } else if (rundownRuntime.state === 'OVERRIDDEN') {
+        rundownRuntime.state = 'READY';
+        broadcastRundownState();
+      }
       broadcastAirState();
     }
   }, outMs + SWITCH_GAP_MS);
@@ -1200,6 +1581,20 @@ function triggerOut() {
   if (airState.phase === 'IDLE' || !airState.currentAsset) {
     airState.queuedAsset = null;
     airState.phase = 'IDLE';
+    if (rundownRuntime.activeCueId) {
+      rundownRuntime.activeCueId = null;
+      const items = getActiveProfile().rundown || [];
+      if (rundownRuntime.currentIndex + 1 < items.length) {
+        rundownRuntime.nextIndex = rundownRuntime.currentIndex + 1;
+      } else {
+        rundownRuntime.nextIndex = -1;
+      }
+      rundownRuntime.state = rundownRuntime.nextIndex >= 0 ? 'READY' : 'IDLE';
+      broadcastRundownState();
+    } else if (rundownRuntime.state === 'OVERRIDDEN') {
+      rundownRuntime.state = 'READY';
+      broadcastRundownState();
+    }
     broadcastAirState();
     return;
   }
@@ -1239,6 +1634,20 @@ function triggerOut() {
       runEnter(next);
     } else {
       airState.phase = 'IDLE';
+      if (rundownRuntime.activeCueId) {
+        rundownRuntime.activeCueId = null;
+        const items = getActiveProfile().rundown || [];
+        if (rundownRuntime.currentIndex + 1 < items.length) {
+          rundownRuntime.nextIndex = rundownRuntime.currentIndex + 1;
+        } else {
+          rundownRuntime.nextIndex = -1;
+        }
+        rundownRuntime.state = rundownRuntime.nextIndex >= 0 ? 'READY' : 'IDLE';
+        broadcastRundownState();
+      } else if (rundownRuntime.state === 'OVERRIDDEN') {
+        rundownRuntime.state = 'READY';
+        broadcastRundownState();
+      }
       broadcastAirState();
     }
   }, outMs + SWITCH_GAP_MS);
@@ -1253,6 +1662,21 @@ function triggerCut() {
   airState.autoHideAt = null;
   airState.autoDurationMs = null;
   airState.transitionId += 1;
+
+  if (rundownRuntime.activeCueId) {
+    rundownRuntime.activeCueId = null;
+    const items = getActiveProfile().rundown || [];
+    if (rundownRuntime.currentIndex + 1 < items.length) {
+      rundownRuntime.nextIndex = rundownRuntime.currentIndex + 1;
+    } else {
+      rundownRuntime.nextIndex = -1;
+    }
+    rundownRuntime.state = rundownRuntime.nextIndex >= 0 ? 'READY' : 'IDLE';
+    broadcastRundownState();
+  } else if (rundownRuntime.state === 'OVERRIDDEN') {
+    rundownRuntime.state = 'READY';
+    broadcastRundownState();
+  }
 
   io.emit('overlay:cmd', {
     type: 'CUT',
@@ -1300,6 +1724,7 @@ io.on('connection', (socket) => {
   socket.emit('profiles:state', publicProfilesState());
   socket.emit('assets:list', getActiveAssets());
   socket.emit('air:state', publicAirState());
+  socket.emit('rundown:state', publicRundownState());
   broadcastAirState();
 
   socket.on('air:take', (payload = {}) => {
@@ -1627,6 +2052,212 @@ io.on('connection', (socket) => {
     if (typeof ack === 'function') ack({ ok: true, count: next.length });
   });
 
+  // --- FOLDER MANAGEMENT ---
+  socket.on('folder:create', ({ name, color } = {}, ack) => {
+    const prof = getActiveProfile();
+    prof.folders = prof.folders || [];
+    const newFolder = normalizeFolder({
+      name: name || `Dossier ${prof.folders.length + 1}`,
+      color: color || '#FAB001'
+    }, prof.folders.length);
+    prof.folders.push(newFolder);
+    prof.updatedAt = Date.now();
+    saveStore(store);
+    broadcastAssets();
+    if (typeof ack === 'function') ack({ ok: true, folder: newFolder });
+  });
+
+  socket.on('folder:rename', ({ id, name, color } = {}, ack) => {
+    const prof = getActiveProfile();
+    const folder = (prof.folders || []).find((f) => f.id === id);
+    if (folder) {
+      if (typeof name === 'string' && name.trim()) folder.name = name.trim().slice(0, 50);
+      if (typeof color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(color)) folder.color = color.toUpperCase();
+      prof.updatedAt = Date.now();
+      saveStore(store);
+      broadcastAssets();
+    }
+    if (typeof ack === 'function') ack({ ok: true, folder });
+  });
+
+  socket.on('folder:toggleCollapse', ({ id, collapsed } = {}, ack) => {
+    const prof = getActiveProfile();
+    const folder = (prof.folders || []).find((f) => f.id === id);
+    if (folder) {
+      folder.collapsed = typeof collapsed === 'boolean' ? collapsed : !folder.collapsed;
+      prof.updatedAt = Date.now();
+      saveStore(store);
+      broadcastAssets();
+    }
+    if (typeof ack === 'function') ack({ ok: true, folder });
+  });
+
+  socket.on('folder:delete', ({ id, deleteAssets = false } = {}, ack) => {
+    const prof = getActiveProfile();
+    prof.folders = prof.folders || [];
+    const idx = prof.folders.findIndex((f) => f.id === id);
+    if (idx >= 0) {
+      prof.folders.splice(idx, 1);
+      if (deleteAssets) {
+        prof.assets = prof.assets.filter((a) => a.folderId !== id);
+      } else {
+        prof.assets.forEach((a) => {
+          if (a.folderId === id) a.folderId = null;
+        });
+      }
+      prof.updatedAt = Date.now();
+      saveStore(store);
+      broadcastAssets();
+    }
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+
+  socket.on('asset:moveToFolder', ({ assetId, folderId, targetIndex } = {}, ack) => {
+    const activeList = getActiveAssets();
+    const asset = activeList.find((a) => a.id === assetId);
+    if (asset) {
+      asset.folderId = folderId || null;
+      if (typeof targetIndex === 'number' && targetIndex >= 0) {
+        const curIdx = activeList.indexOf(asset);
+        if (curIdx >= 0) {
+          activeList.splice(curIdx, 1);
+          activeList.splice(Math.min(activeList.length, targetIndex), 0, asset);
+        }
+      }
+      getActiveProfile().updatedAt = Date.now();
+      saveStore(store);
+      broadcastAssets();
+    }
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+
+  // --- CONDUCTEUR / RUNDOWN PLAYLIST ---
+  socket.on('rundown:next', () => {
+    if (socket.data.role === 'streamdeck' && !socket.data.compatible) return;
+    triggerRundownNext();
+  });
+
+  socket.on('rundown:jump', ({ index, cueId } = {}, ack) => {
+    if (socket.data.role === 'streamdeck' && !socket.data.compatible) return;
+    const items = getActiveProfile().rundown || [];
+    let targetIdx = -1;
+    if (typeof index === 'number') {
+      targetIdx = index;
+    } else if (cueId) {
+      targetIdx = items.findIndex((c) => c.id === cueId);
+    }
+    if (targetIdx >= 0 && targetIdx < items.length) {
+      rundownRuntime.nextIndex = targetIdx;
+      rundownRuntime.state = 'READY';
+      broadcastRundownState();
+    }
+    if (typeof ack === 'function') ack({ ok: true, nextIndex: rundownRuntime.nextIndex });
+  });
+
+  socket.on('rundown:reset', (_payload, ack) => {
+    if (socket.data.role === 'streamdeck' && !socket.data.compatible) return;
+    rundownRuntime.currentIndex = -1;
+    rundownRuntime.nextIndex = 0;
+    rundownRuntime.activeCueId = null;
+    rundownRuntime.state = 'READY';
+    broadcastRundownState();
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+
+  socket.on('rundown:addItem', ({ assetId, note = '' } = {}, ack) => {
+    if (!assetId) {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+    const prof = getActiveProfile();
+    prof.rundown = prof.rundown || [];
+    const newItem = normalizeRundownItem({ assetId, note });
+    prof.rundown.push(newItem);
+    prof.updatedAt = Date.now();
+    saveStore(store);
+    broadcastRundownState();
+    if (typeof ack === 'function') ack({ ok: true, item: newItem });
+  });
+
+  socket.on('rundown:addMany', ({ assetIds = [] } = {}, ack) => {
+    if (!Array.isArray(assetIds) || assetIds.length === 0) {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+    const prof = getActiveProfile();
+    prof.rundown = prof.rundown || [];
+    for (const assetId of assetIds) {
+      prof.rundown.push(normalizeRundownItem({ assetId }));
+    }
+    prof.updatedAt = Date.now();
+    saveStore(store);
+    broadcastRundownState();
+    if (typeof ack === 'function') ack({ ok: true, count: assetIds.length });
+  });
+
+  socket.on('rundown:removeItem', (cueId, ack) => {
+    const prof = getActiveProfile();
+    prof.rundown = prof.rundown || [];
+    const idx = prof.rundown.findIndex((c) => c.id === cueId);
+    if (idx >= 0) {
+      prof.rundown.splice(idx, 1);
+      if (rundownRuntime.nextIndex >= prof.rundown.length) {
+        rundownRuntime.nextIndex = Math.max(0, prof.rundown.length - 1);
+      }
+      prof.updatedAt = Date.now();
+      saveStore(store);
+      broadcastRundownState();
+    }
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+
+  socket.on('rundown:reorder', (orderedCueIds = [], ack) => {
+    if (!Array.isArray(orderedCueIds)) return;
+    const prof = getActiveProfile();
+    prof.rundown = prof.rundown || [];
+    const map = new Map(prof.rundown.map((c) => [c.id, c]));
+    const next = [];
+    for (const id of orderedCueIds) {
+      if (map.has(id)) {
+        next.push(map.get(id));
+        map.delete(id);
+      }
+    }
+    for (const rem of map.values()) {
+      next.push(rem);
+    }
+    prof.rundown = next;
+    prof.updatedAt = Date.now();
+    saveStore(store);
+    broadcastRundownState();
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+
+  socket.on('rundown:updateNote', ({ cueId, note } = {}, ack) => {
+    const prof = getActiveProfile();
+    const item = (prof.rundown || []).find((c) => c.id === cueId);
+    if (item) {
+      item.note = String(note || '').slice(0, 100);
+      prof.updatedAt = Date.now();
+      saveStore(store);
+      broadcastRundownState();
+    }
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+
+  socket.on('rundown:clear', (_payload, ack) => {
+    const prof = getActiveProfile();
+    prof.rundown = [];
+    prof.updatedAt = Date.now();
+    rundownRuntime.currentIndex = -1;
+    rundownRuntime.nextIndex = 0;
+    rundownRuntime.activeCueId = null;
+    rundownRuntime.state = 'READY';
+    saveStore(store);
+    broadcastRundownState();
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+
   socket.on('disconnect', () => {
     broadcastAirState();
   });
@@ -1671,5 +2302,9 @@ module.exports = {
   triggerCut,
   triggerHoldManual,
   getAirState: publicAirState,
-  checkGitHubRelease
+  checkGitHubRelease,
+  registerExportHandler,
+  findFFmpegBinary,
+  publicRundownState,
+  triggerRundownNext
 };

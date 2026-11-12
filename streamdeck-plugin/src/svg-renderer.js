@@ -571,3 +571,206 @@ export function renderHoldKey({
     </svg>
   `);
 }
+
+/**
+ * Dynamic 144x144 Broadcast Key for "Conducteur (NEXT CUE)"
+ * Displays live cue state, upcoming cue precharge, and countdown
+ */
+export function renderRundownNextKey({
+  connected,
+  versionMismatch,
+  pluginVersion,
+  serverVersion,
+  rundownState,
+  airState,
+  nowServer = Date.now()
+}) {
+  if (connected && versionMismatch) {
+    return renderVersionMismatchKey({ pluginVersion, serverVersion });
+  }
+
+  if (!connected) {
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndOffline" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2D1115"/>
+            <stop offset="100%" stop-color="#14080A"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndOffline)"/>
+        <rect width="144" height="30" fill="#D90429"/>
+        <text x="72" y="20" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="900" text-anchor="middle">CONDUCTEUR</text>
+        <circle cx="72" cy="72" r="18" fill="none" stroke="#FF5C72" stroke-width="3" stroke-dasharray="4 4"/>
+        <text x="72" y="78" fill="#FF5C72" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="900" text-anchor="middle">OFF</text>
+        <text x="72" y="115" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="middle">HORS LIGNE</text>
+        <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#D90429" stroke-width="3"/>
+      </svg>
+    `);
+  }
+
+  const items = rundownState?.items || [];
+  const currIdx = typeof rundownState?.currentIndex === 'number' ? rundownState.currentIndex : -1;
+  const nextIdx = typeof rundownState?.nextIndex === 'number' ? rundownState.nextIndex : -1;
+  const activeCue = rundownState?.currentCue || (currIdx >= 0 && items[currIdx]);
+  const nextCue = rundownState?.nextCue || (nextIdx >= 0 && items[nextIdx]);
+
+  const phase = airState?.phase || 'IDLE';
+  const isCueOnAir = Boolean(rundownState?.activeCueId && (phase === 'ON_AIR' || phase === 'ENTERING'));
+  const isTransition = phase === 'EXITING' || phase === 'ENTERING';
+
+  // 1. A Cue from the Conductor is currently ON AIR
+  if (isCueOnAir && activeCue) {
+    const asset = activeCue.asset || {};
+    const title = asset.primaryText || 'Sans titre';
+    const lines = wrapText(title, 11, 2);
+    const hasAuto = phase === 'ON_AIR' && airState?.autoHideAt && airState?.autoDurationMs > 0;
+    let timerSec = '';
+    let progressRatio = 0;
+
+    if (hasAuto) {
+      const remMs = Math.max(0, airState.autoHideAt - nowServer);
+      progressRatio = Math.min(1, Math.max(0, remMs / airState.autoDurationMs));
+      timerSec = (remMs / 1000).toFixed(1) + 's';
+    }
+
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndLive" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3D0B0F"/>
+            <stop offset="100%" stop-color="#1F0407"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndLive)"/>
+        
+        <!-- Live Header Bar -->
+        <rect width="144" height="28" fill="#EF233C"/>
+        <text x="72" y="19" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">● EN DIRECT • CUE #${currIdx + 1}</text>
+
+        <!-- Center Cue Title -->
+        ${renderLinesSvg(lines, 72, 60, '#FFFFFF', 18)}
+
+        <!-- Countdown or Mode Indicator -->
+        ${
+          hasAuto
+            ? `
+            <rect x="22" y="85" width="100" height="18" rx="5" fill="#5E0B12"/>
+            <rect x="22" y="85" width="${Math.round(100 * progressRatio)}" height="18" rx="5" fill="#EF233C"/>
+            <text x="72" y="98.5" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">⏱ ${timerSec}</text>
+          `
+            : `
+            <rect x="26" y="85" width="92" height="18" rx="5" fill="#5E0B12" stroke="#EF233C" stroke-width="1.5"/>
+            <text x="72" y="98.5" fill="#FF8591" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="900" text-anchor="middle">MANUEL (CLIC SORT)</text>
+          `
+        }
+
+        <!-- Bottom Action Bar -->
+        <rect x="0" y="116" width="144" height="28" fill="#140204"/>
+        <text x="72" y="134" fill="#FF8591" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" font-weight="900" text-anchor="middle">CLIC : SORTIR / SUIVANT</text>
+
+        <rect x="2.5" y="2.5" width="139" height="139" rx="19.5" fill="none" stroke="#EF233C" stroke-width="4"/>
+      </svg>
+    `);
+  }
+
+  // 2. In Transition
+  if (isTransition) {
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndTrans" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3A2A03"/>
+            <stop offset="100%" stop-color="#1A1301"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndTrans)"/>
+        <rect width="144" height="28" fill="#FAB001"/>
+        <text x="72" y="19" fill="#000000" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="900" text-anchor="middle">TRANSITION...</text>
+        <path d="M50 72L94 72M76 56L94 72L76 88" stroke="#FAB001" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="72" y="122" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="middle">EN COURS</text>
+        <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#FAB001" stroke-width="3"/>
+      </svg>
+    `);
+  }
+
+  // 3. Ready / Next Cue is Precharged
+  if (nextCue) {
+    const asset = nextCue.asset || {};
+    const title = asset.primaryText || 'Sans titre';
+    const lines = wrapText(title, 11, 2);
+    const modeStr = asset.mode === 'auto' ? `AUTO ${asset.duration || 6}s` : 'MANUEL';
+
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndNext" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1F281E"/>
+            <stop offset="100%" stop-color="#0E140E"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndNext)"/>
+
+        <!-- Header: Next Cue Index -->
+        <rect width="144" height="28" fill="#FAB001"/>
+        <text x="72" y="19" fill="#000000" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="900" text-anchor="middle">PRÊT ▶ CUE #${nextIdx + 1}</text>
+
+        <!-- Center: Asset Name -->
+        ${renderLinesSvg(lines, 72, 60, '#FFFFFF', 18)}
+
+        <!-- Specs Badge -->
+        <rect x="28" y="86" width="88" height="17" rx="4" fill="#141414" stroke="#FAB001" stroke-width="1.2"/>
+        <text x="72" y="98.5" fill="#FAB001" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" font-weight="800" text-anchor="middle">${esc(modeStr)}</text>
+
+        <!-- Bottom: Action prompt -->
+        <rect x="0" y="116" width="144" height="28" fill="#121812"/>
+        <text x="72" y="134" fill="#69F0AE" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">CLIC : NEXT CUE ▶</text>
+
+        <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#25C26E" stroke-width="3"/>
+      </svg>
+    `);
+  }
+
+  // 4. End of Conductor (All cues completed)
+  if (items.length > 0 && nextIdx < 0) {
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndDone" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0E331E"/>
+            <stop offset="100%" stop-color="#07190F"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndDone)"/>
+        <rect width="144" height="28" fill="#25C26E"/>
+        <text x="72" y="19" fill="#000000" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">✔ CONDUCTEUR FINI</text>
+        <circle cx="72" cy="66" r="16" fill="#25C26E"/>
+        <path d="M64 66L70 72L80 59" stroke="#000000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="72" y="100" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="middle">${items.length} Cues joués</text>
+        <rect x="0" y="116" width="144" height="28" fill="#07190F"/>
+        <text x="72" y="134" fill="#FAB001" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" font-weight="900" text-anchor="middle">CLIC : RECOMMENCER</text>
+        <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#25C26E" stroke-width="3"/>
+      </svg>
+    `);
+  }
+
+  // 5. Empty Rundown
+  return toDataUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+      <defs>
+        <linearGradient id="bgRndEmpty" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1B1E26"/>
+          <stop offset="100%" stop-color="#101217"/>
+        </linearGradient>
+      </defs>
+      <rect width="144" height="144" rx="22" fill="url(#bgRndEmpty)"/>
+      <rect width="144" height="28" fill="#404040"/>
+      <text x="72" y="19" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">CONDUCTEUR</text>
+      <rect x="52" y="52" width="40" height="30" rx="4" fill="none" stroke="#6C757D" stroke-width="3"/>
+      <path d="M60 62H84M60 72H76" stroke="#6C757D" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="72" y="106" fill="#CED4DA" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="800" text-anchor="middle">VIDE (0 CUE)</text>
+      <text x="72" y="125" fill="#6C757D" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle">Ajouter en Régie</text>
+      <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="2"/>
+    </svg>
+  `);
+}

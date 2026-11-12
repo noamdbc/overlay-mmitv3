@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDataFolder: () => ipcRenderer.invoke('app:open-data-folder'),
   openExternal: (url) => ipcRenderer.invoke('app:open-external', String(url || '')),
   setFullScreen: (enabled) => ipcRenderer.invoke('app:set-fullscreen', Boolean(enabled)),
+  exportMovVideo: (options) => ipcRenderer.invoke('app:export-video-mov', options),
+  showItemInFolder: (filePath) => ipcRenderer.invoke('app:show-item-in-folder', filePath),
+  saveFileDialog: (defaultName) => ipcRenderer.invoke('app:save-file-dialog', defaultName),
   quitApp: () => ipcRenderer.invoke('app:quit'),
   onMenuAction: (callback) => {
     if (typeof callback !== 'function') return;

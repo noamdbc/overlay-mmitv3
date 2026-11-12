@@ -25797,7 +25797,7 @@ Object.assign(lookup, {
 
 // src/bridge.js
 var DEFAULT_SERVER_URL = "http://localhost:3000";
-var PLUGIN_VERSION = true ? "1.2.1" : "1.0.0";
+var PLUGIN_VERSION = true ? "1.2.2" : "1.0.0";
 var OverlayBridge = class {
   constructor() {
     this.serverUrl = DEFAULT_SERVER_URL;
@@ -25815,6 +25815,15 @@ var OverlayBridge = class {
       queuedAsset: null,
       autoHideAt: null,
       autoDurationMs: null
+    };
+    this.rundownState = {
+      items: [],
+      currentIndex: -1,
+      nextIndex: 0,
+      activeCueId: null,
+      state: "READY",
+      currentCue: null,
+      nextCue: null
     };
     this.clockOffsetMs = 0;
     this.tickInterval = null;
@@ -25908,6 +25917,11 @@ var OverlayBridge = class {
       this.syncTicker();
       this.notifyState();
     });
+    this.socket.on("rundown:state", (state) => {
+      if (!state) return;
+      this.rundownState = state;
+      this.notifyState();
+    });
   }
   getNowServer() {
     return Date.now() + this.clockOffsetMs;
@@ -25981,6 +25995,11 @@ var OverlayBridge = class {
     this.socket.emit("air:hold");
     return true;
   }
+  triggerRundownNext() {
+    if (!this.socket || !this.connected || this.versionMismatch) return false;
+    this.socket.emit("rundown:next");
+    return true;
+  }
   switchProfile(profileId) {
     if (!this.socket || !this.connected || this.versionMismatch || !profileId) return false;
     this.socket.emit("profile:switch", profileId);
@@ -25997,7 +26016,8 @@ var OverlayBridge = class {
       assets: this.assets,
       profiles: this.profiles,
       activeProfileId: this.activeProfileId,
-      airState: this.airState
+      airState: this.airState,
+      rundownState: this.rundownState
     };
   }
 };
@@ -26510,6 +26530,184 @@ function renderHoldKey({
     </svg>
   `);
 }
+function renderRundownNextKey({
+  connected,
+  versionMismatch,
+  pluginVersion,
+  serverVersion,
+  rundownState,
+  airState,
+  nowServer = Date.now()
+}) {
+  if (connected && versionMismatch) {
+    return renderVersionMismatchKey({ pluginVersion, serverVersion });
+  }
+  if (!connected) {
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndOffline" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2D1115"/>
+            <stop offset="100%" stop-color="#14080A"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndOffline)"/>
+        <rect width="144" height="30" fill="#D90429"/>
+        <text x="72" y="20" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="900" text-anchor="middle">CONDUCTEUR</text>
+        <circle cx="72" cy="72" r="18" fill="none" stroke="#FF5C72" stroke-width="3" stroke-dasharray="4 4"/>
+        <text x="72" y="78" fill="#FF5C72" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="900" text-anchor="middle">OFF</text>
+        <text x="72" y="115" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="middle">HORS LIGNE</text>
+        <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#D90429" stroke-width="3"/>
+      </svg>
+    `);
+  }
+  const items = rundownState?.items || [];
+  const currIdx = typeof rundownState?.currentIndex === "number" ? rundownState.currentIndex : -1;
+  const nextIdx = typeof rundownState?.nextIndex === "number" ? rundownState.nextIndex : -1;
+  const activeCue = rundownState?.currentCue || currIdx >= 0 && items[currIdx];
+  const nextCue = rundownState?.nextCue || nextIdx >= 0 && items[nextIdx];
+  const phase = airState?.phase || "IDLE";
+  const isCueOnAir = Boolean(rundownState?.activeCueId && (phase === "ON_AIR" || phase === "ENTERING"));
+  const isTransition = phase === "EXITING" || phase === "ENTERING";
+  if (isCueOnAir && activeCue) {
+    const asset = activeCue.asset || {};
+    const title = asset.primaryText || "Sans titre";
+    const lines = wrapText(title, 11, 2);
+    const hasAuto = phase === "ON_AIR" && airState?.autoHideAt && airState?.autoDurationMs > 0;
+    let timerSec = "";
+    let progressRatio = 0;
+    if (hasAuto) {
+      const remMs = Math.max(0, airState.autoHideAt - nowServer);
+      progressRatio = Math.min(1, Math.max(0, remMs / airState.autoDurationMs));
+      timerSec = (remMs / 1e3).toFixed(1) + "s";
+    }
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndLive" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3D0B0F"/>
+            <stop offset="100%" stop-color="#1F0407"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndLive)"/>
+        
+        <!-- Live Header Bar -->
+        <rect width="144" height="28" fill="#EF233C"/>
+        <text x="72" y="19" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">\u25CF EN DIRECT \u2022 CUE #${currIdx + 1}</text>
+
+        <!-- Center Cue Title -->
+        ${renderLinesSvg(lines, 72, 60, "#FFFFFF", 18)}
+
+        <!-- Countdown or Mode Indicator -->
+        ${hasAuto ? `
+            <rect x="22" y="85" width="100" height="18" rx="5" fill="#5E0B12"/>
+            <rect x="22" y="85" width="${Math.round(100 * progressRatio)}" height="18" rx="5" fill="#EF233C"/>
+            <text x="72" y="98.5" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">\u23F1 ${timerSec}</text>
+          ` : `
+            <rect x="26" y="85" width="92" height="18" rx="5" fill="#5E0B12" stroke="#EF233C" stroke-width="1.5"/>
+            <text x="72" y="98.5" fill="#FF8591" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="900" text-anchor="middle">MANUEL (CLIC SORT)</text>
+          `}
+
+        <!-- Bottom Action Bar -->
+        <rect x="0" y="116" width="144" height="28" fill="#140204"/>
+        <text x="72" y="134" fill="#FF8591" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" font-weight="900" text-anchor="middle">CLIC : SORTIR / SUIVANT</text>
+
+        <rect x="2.5" y="2.5" width="139" height="139" rx="19.5" fill="none" stroke="#EF233C" stroke-width="4"/>
+      </svg>
+    `);
+  }
+  if (isTransition) {
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndTrans" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3A2A03"/>
+            <stop offset="100%" stop-color="#1A1301"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndTrans)"/>
+        <rect width="144" height="28" fill="#FAB001"/>
+        <text x="72" y="19" fill="#000000" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="900" text-anchor="middle">TRANSITION...</text>
+        <path d="M50 72L94 72M76 56L94 72L76 88" stroke="#FAB001" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="72" y="122" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="middle">EN COURS</text>
+        <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#FAB001" stroke-width="3"/>
+      </svg>
+    `);
+  }
+  if (nextCue) {
+    const asset = nextCue.asset || {};
+    const title = asset.primaryText || "Sans titre";
+    const lines = wrapText(title, 11, 2);
+    const modeStr = asset.mode === "auto" ? `AUTO ${asset.duration || 6}s` : "MANUEL";
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndNext" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1F281E"/>
+            <stop offset="100%" stop-color="#0E140E"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndNext)"/>
+
+        <!-- Header: Next Cue Index -->
+        <rect width="144" height="28" fill="#FAB001"/>
+        <text x="72" y="19" fill="#000000" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="900" text-anchor="middle">PR\xCAT \u25B6 CUE #${nextIdx + 1}</text>
+
+        <!-- Center: Asset Name -->
+        ${renderLinesSvg(lines, 72, 60, "#FFFFFF", 18)}
+
+        <!-- Specs Badge -->
+        <rect x="28" y="86" width="88" height="17" rx="4" fill="#141414" stroke="#FAB001" stroke-width="1.2"/>
+        <text x="72" y="98.5" fill="#FAB001" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" font-weight="800" text-anchor="middle">${esc2(modeStr)}</text>
+
+        <!-- Bottom: Action prompt -->
+        <rect x="0" y="116" width="144" height="28" fill="#121812"/>
+        <text x="72" y="134" fill="#69F0AE" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">CLIC : NEXT CUE \u25B6</text>
+
+        <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#25C26E" stroke-width="3"/>
+      </svg>
+    `);
+  }
+  if (items.length > 0 && nextIdx < 0) {
+    return toDataUri(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+        <defs>
+          <linearGradient id="bgRndDone" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0E331E"/>
+            <stop offset="100%" stop-color="#07190F"/>
+          </linearGradient>
+        </defs>
+        <rect width="144" height="144" rx="22" fill="url(#bgRndDone)"/>
+        <rect width="144" height="28" fill="#25C26E"/>
+        <text x="72" y="19" fill="#000000" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">\u2714 CONDUCTEUR FINI</text>
+        <circle cx="72" cy="66" r="16" fill="#25C26E"/>
+        <path d="M64 66L70 72L80 59" stroke="#000000" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="72" y="100" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="middle">${items.length} Cues jou\xE9s</text>
+        <rect x="0" y="116" width="144" height="28" fill="#07190F"/>
+        <text x="72" y="134" fill="#FAB001" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" font-weight="900" text-anchor="middle">CLIC : RECOMMENCER</text>
+        <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#25C26E" stroke-width="3"/>
+      </svg>
+    `);
+  }
+  return toDataUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+      <defs>
+        <linearGradient id="bgRndEmpty" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1B1E26"/>
+          <stop offset="100%" stop-color="#101217"/>
+        </linearGradient>
+      </defs>
+      <rect width="144" height="144" rx="22" fill="url(#bgRndEmpty)"/>
+      <rect width="144" height="28" fill="#404040"/>
+      <text x="72" y="19" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="11.5" font-weight="900" text-anchor="middle">CONDUCTEUR</text>
+      <rect x="52" y="52" width="40" height="30" rx="4" fill="none" stroke="#6C757D" stroke-width="3"/>
+      <path d="M60 62H84M60 72H76" stroke="#6C757D" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="72" y="106" fill="#CED4DA" font-family="Segoe UI, Arial, sans-serif" font-size="13.5" font-weight="800" text-anchor="middle">VIDE (0 CUE)</text>
+      <text x="72" y="125" fill="#6C757D" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle">Ajouter en R\xE9gie</text>
+      <rect x="2" y="2" width="140" height="140" rx="20" fill="none" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="2"/>
+    </svg>
+  `);
+}
 
 // src/actions/asset-action.js
 var LONG_PRESS_MS = 450;
@@ -26801,6 +26999,52 @@ var HoldAction = class extends SingletonAction {
   }
 };
 
+// src/actions/rundown-next-action.js
+var RundownNextAction = class extends SingletonAction {
+  manifestId = "fr.mmitv.overlay.rundown-next";
+  constructor() {
+    super();
+    this.lastSvg = /* @__PURE__ */ new Map();
+    bridge.onStateChange(() => this.refreshAll());
+    bridge.onCountdownTick(() => this.refreshAll());
+  }
+  onWillAppear(ev) {
+    this.lastSvg.delete(ev.action.id);
+    this.renderSingle(ev.action);
+  }
+  onWillDisappear(ev) {
+    this.lastSvg.delete(ev.action.id);
+  }
+  onKeyDown(ev) {
+    if (!bridge.connected || bridge.versionMismatch) {
+      ev.action.showAlert();
+      return;
+    }
+    bridge.triggerRundownNext();
+  }
+  refreshAll() {
+    for (const action2 of this.actions) {
+      this.renderSingle(action2);
+    }
+  }
+  renderSingle(action2) {
+    if (!action2.isKey()) return;
+    const svgUri = renderRundownNextKey({
+      connected: bridge.connected,
+      versionMismatch: bridge.versionMismatch,
+      pluginVersion: bridge.pluginVersion,
+      serverVersion: bridge.serverVersion,
+      rundownState: bridge.rundownState,
+      airState: bridge.airState,
+      nowServer: bridge.getNowServer()
+    });
+    if (this.lastSvg.get(action2.id) !== svgUri) {
+      this.lastSvg.set(action2.id, svgUri);
+      action2.setImage(svgUri);
+    }
+  }
+};
+
 // src/plugin.js
 var DEFAULT_SERVER_URL2 = "http://localhost:3000";
 plugin_default.settings.useLegacySettingsBehavior = true;
@@ -26808,6 +27052,7 @@ plugin_default.actions.registerAction(new AssetAction());
 plugin_default.actions.registerAction(new OutAction());
 plugin_default.actions.registerAction(new CutAction());
 plugin_default.actions.registerAction(new HoldAction());
+plugin_default.actions.registerAction(new RundownNextAction());
 function pushStateToInspector() {
   if (plugin_default.ui.action) {
     plugin_default.ui.sendToPropertyInspector(bridge.getInspectorPayload()).catch(() => {

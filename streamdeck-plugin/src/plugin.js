@@ -4,6 +4,7 @@ import { AssetAction } from './actions/asset-action.js';
 import { OutAction } from './actions/out-action.js';
 import { CutAction } from './actions/cut-action.js';
 import { HoldAction } from './actions/hold-action.js';
+import { RundownNextAction } from './actions/rundown-next-action.js';
 
 const DEFAULT_SERVER_URL = 'http://localhost:3000';
 
@@ -14,6 +15,7 @@ streamDeck.actions.registerAction(new AssetAction());
 streamDeck.actions.registerAction(new OutAction());
 streamDeck.actions.registerAction(new CutAction());
 streamDeck.actions.registerAction(new HoldAction());
+streamDeck.actions.registerAction(new RundownNextAction());
 
 function pushStateToInspector() {
   if (streamDeck.ui.action) {

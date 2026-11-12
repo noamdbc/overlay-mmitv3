@@ -1340,6 +1340,23 @@
 
   // State
   let assets = [];
+  let folders = [];
+  let rundownState = {
+    currentIndex: -1,
+    nextIndex: 0,
+    activeCueId: null,
+    state: 'READY',
+    items: [],
+    currentCue: null,
+    nextCue: null
+  };
+  let activeLeftTab = 'assets'; // 'assets' | 'rundown'
+  let editingFolderId = null;
+  let activeExportAsset = null;
+  let currentExportJobId = null;
+  let exportStartTime = 0;
+  let exportIntervalTimer = null;
+
   let profiles = [];
   let activeProfileId = null;
   let selectedId = null;
@@ -1347,6 +1364,7 @@
   let activeFilter = 'all';
   let searchQuery = '';
   let dragSrcId = null;
+  let dragCueId = null;
 
   let autoSaveEnabled = localStorage.getItem('mmitv_autosave') === '1';
   let autoSaveTimer = null;
@@ -1366,7 +1384,7 @@
   let leftPanelWidth = Math.max(240, Math.min(560, parseInt(localStorage.getItem('mmitv_left_w') || '330', 10) || 330));
   let rightPanelWidth = Math.max(320, Math.min(640, parseInt(localStorage.getItem('mmitv_right_w') || '410', 10) || 410));
   let updateOnStartup = localStorage.getItem('mmitv_update_startup') !== '0';
-  let appVersion = '1.2.1';
+  let appVersion = '1.2.2';
   let githubRepo = 'noamdbc/overlay-mmitv3';
   let hasAvailableUpdate = false;
   let hasStreamDeckMismatch = false;
@@ -2755,8 +2773,134 @@
     pvwRenderer.renderStatic(draft);
   }
 
+  function updateModeCounts() {
+    const assetsBadge = document.getElementById('assetsTotalCountBadge');
+    const rundownBadge = document.getElementById('rundownTotalCountBadge');
+    if (assetsBadge) assetsBadge.textContent = String(assets.length || 0);
+    if (rundownBadge) rundownBadge.textContent = String(rundownState.items ? rundownState.items.length : 0);
+  }
+
+  function switchLeftTab(tab) {
+    activeLeftTab = tab === 'rundown' ? 'rundown' : 'assets';
+    const btnAssets = document.getElementById('btnTabAssets');
+    const btnRundown = document.getElementById('btnTabRundown');
+    const viewAssets = document.getElementById('viewAssets');
+    const viewRundown = document.getElementById('viewRundown');
+
+    if (activeLeftTab === 'rundown') {
+      btnRundown?.classList.add('active');
+      btnAssets?.classList.remove('active');
+      viewRundown?.classList.remove('hidden');
+      viewAssets?.classList.add('hidden');
+      renderRundownUI();
+    } else {
+      btnAssets?.classList.add('active');
+      btnRundown?.classList.remove('active');
+      viewAssets?.classList.remove('hidden');
+      viewRundown?.classList.add('hidden');
+      renderAssetList();
+    }
+  }
+
+  function createAssetRowEl(item, canDrag) {
+    const liveId =
+      airState.phase !== 'IDLE' && airState.currentAsset ? airState.currentAsset.id : null;
+    const queuedId = airState.queuedAsset ? airState.queuedAsset.id : null;
+    const isSelected = item.id === selectedId;
+    const isLive = item.id === liveId && airState.phase !== 'EXITING';
+    const isQueued = item.id === queuedId;
+
+    const row = document.createElement('div');
+    row.className = [
+      'asset-item',
+      isSelected ? 'is-selected' : '',
+      isLive ? 'is-live' : '',
+      isQueued ? 'is-queued' : ''
+    ]
+      .filter(Boolean)
+      .join(' ');
+    row.dataset.id = item.id;
+    row.draggable = canDrag;
+
+    const kindIcon =
+      item.align === 'center' || item.kind === 'titre'
+        ? 'fa-closed-captioning'
+        : 'fa-id-badge';
+
+    const modeBadge =
+      item.mode === 'auto' ? `AUTO ${item.duration}s` : 'MANUEL';
+
+    row.innerHTML = `
+      <span class="asset-swatch" style="background:${item.accentColor || '#FAB001'}"></span>
+      <div class="asset-info">
+        <div class="asset-top-line">
+          <i class="fa-solid ${kindIcon} asset-kind-ico"></i>
+          <span class="asset-primary">${escapeText(item.primaryText || 'Sans titre')}</span>
+        </div>
+        <div class="asset-meta-line">
+          <span class="asset-secondary">${escapeText(item.secondaryText || (item.kind === 'titre' ? 'Titre centré' : 'Synthé'))}</span>
+          <span class="asset-mode-tag">${isQueued ? 'SUIVANT' : modeBadge}</span>
+        </div>
+      </div>
+      <div class="asset-actions">
+        <button type="button" class="btn-row-mini" data-act="rnd" title="Ajouter au conducteur d'émission">
+          <i class="fa-solid fa-list-check"></i>
+        </button>
+        <button type="button" class="btn-row-mini" data-act="dup" title="Dupliquer">
+          <i class="fa-regular fa-clone"></i>
+        </button>
+        <button type="button" class="btn-row-mini danger" data-act="del" title="Supprimer">
+          <i class="fa-regular fa-trash-can"></i>
+        </button>
+        <button type="button" class="btn-row-air" data-act="air" title="${isLive ? 'Sortir de l\'antenne' : 'Envoyer en direct'}">
+          <i class="fa-solid ${isLive ? 'fa-stop' : 'fa-play'}"></i>
+        </button>
+      </div>
+    `;
+
+    if (canDrag) {
+      row.addEventListener('dragstart', (e) => {
+        dragSrcId = item.id;
+        row.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', item.id);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      row.addEventListener('dragend', () => {
+        dragSrcId = null;
+        row.classList.remove('dragging');
+      });
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!dragSrcId || dragSrcId === item.id) return;
+        const targetFolderId = item.folderId || null;
+        const currentSrc = assets.find((a) => a.id === dragSrcId);
+        if (currentSrc && currentSrc.folderId !== targetFolderId) {
+          socket.emit('asset:moveToFolder', { assetId: dragSrcId, folderId: targetFolderId });
+        } else {
+          const ids = assets.map((a) => a.id);
+          const from = ids.indexOf(dragSrcId);
+          const to = ids.indexOf(item.id);
+          if (from >= 0 && to >= 0) {
+            ids.splice(from, 1);
+            ids.splice(to, 0, dragSrcId);
+            socket.emit('asset:reorder', ids);
+          }
+        }
+      });
+    }
+
+    return row;
+  }
+
   function renderAssetList() {
     const listEl = document.getElementById('assetList');
+    if (!listEl) return;
     listEl.innerHTML = '';
 
     const q = searchQuery.trim().toLowerCase();
@@ -2771,89 +2915,545 @@
       return true;
     });
 
-    const liveId =
-      airState.phase !== 'IDLE' && airState.currentAsset ? airState.currentAsset.id : null;
-    const queuedId = airState.queuedAsset ? airState.queuedAsset.id : null;
+    updateModeCounts();
 
-    for (const item of filtered) {
-      const isSelected = item.id === selectedId;
-      const isLive = item.id === liveId && airState.phase !== 'EXITING';
-      const isQueued = item.id === queuedId;
+    if (activeFilter !== 'all' || q) {
+      for (const item of filtered) {
+        listEl.appendChild(createAssetRowEl(item, false));
+      }
+      return;
+    }
 
-      const row = document.createElement('div');
-      row.className = [
-        'asset-item',
-        isSelected ? 'is-selected' : '',
-        isLive ? 'is-live' : '',
-        isQueued ? 'is-queued' : ''
+    // 1. Render Folders
+    for (const folder of folders) {
+      const folderEl = document.createElement('div');
+      folderEl.className = `asset-folder ${folder.collapsed ? 'collapsed' : ''}`;
+      folderEl.dataset.folderId = folder.id;
+
+      const folderAssets = assets.filter((a) => a.folderId === folder.id);
+
+      folderEl.innerHTML = `
+        <div class="folder-header" data-folder-act="toggle">
+          <div class="folder-header-left">
+            <i class="fa-solid fa-chevron-down folder-chevron"></i>
+            <span class="folder-color-dot" style="background:${escapeText(folder.color || '#3b82f6')}; color:${escapeText(folder.color || '#3b82f6')};"></span>
+            <span class="folder-name">${escapeText(folder.name || 'Dossier')}</span>
+            <span class="folder-count-badge">${folderAssets.length}</span>
+          </div>
+          <div class="folder-header-actions">
+            <button type="button" class="folder-btn-action" data-folder-act="edit" title="Renommer / Changer la couleur">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            <button type="button" class="folder-btn-action btn-del-folder" data-folder-act="del" title="Supprimer le dossier">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+        <div class="folder-assets-list" data-folder-drop="${folder.id}"></div>
+      `;
+
+      const assetsContainer = folderEl.querySelector('.folder-assets-list');
+
+      folderEl.addEventListener('dragover', (e) => {
+        if (!dragSrcId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        folderEl.classList.add('is-drag-over');
+        e.dataTransfer.dropEffect = 'move';
+      });
+      folderEl.addEventListener('dragleave', (e) => {
+        if (!folderEl.contains(e.relatedTarget)) {
+          folderEl.classList.remove('is-drag-over');
+        }
+      });
+      folderEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        folderEl.classList.remove('is-drag-over');
+        if (!dragSrcId) return;
+        socket.emit('asset:moveToFolder', { assetId: dragSrcId, folderId: folder.id });
+      });
+
+      if (folderAssets.length === 0) {
+        const emptyZone = document.createElement('div');
+        emptyZone.className = 'folder-empty-zone';
+        emptyZone.textContent = 'Glissez des assets ici pour ranger ce dossier';
+        assetsContainer.appendChild(emptyZone);
+      } else {
+        for (const item of folderAssets) {
+          assetsContainer.appendChild(createAssetRowEl(item, canDrag));
+        }
+      }
+
+      listEl.appendChild(folderEl);
+    }
+
+    // 2. Render Root assets (assets not in any folder)
+    const rootAssets = assets.filter((a) => !a.folderId || !folders.some((f) => f.id === a.folderId));
+    const rootZone = document.createElement('div');
+    rootZone.className = 'assets-root-zone';
+
+    if (folders.length > 0) {
+      const rootHeader = document.createElement('div');
+      rootHeader.className = 'assets-root-header';
+      rootHeader.innerHTML = `<span>Assets hors dossiers</span> <span class="folder-count-badge">${rootAssets.length}</span>`;
+      rootZone.appendChild(rootHeader);
+    }
+
+    rootZone.addEventListener('dragover', (e) => {
+      if (!dragSrcId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    rootZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!dragSrcId) return;
+      socket.emit('asset:moveToFolder', { assetId: dragSrcId, folderId: null });
+    });
+
+    for (const item of rootAssets) {
+      rootZone.appendChild(createAssetRowEl(item, canDrag));
+    }
+
+    listEl.appendChild(rootZone);
+  }
+
+  function openFolderModal(folderToEdit = null) {
+    editingFolderId = folderToEdit ? folderToEdit.id : null;
+    const modal = document.getElementById('folderModal');
+    const titleEl = document.getElementById('folderModalTitle');
+    const inputEl = document.getElementById('txtFolderName');
+    const submitLabel = document.getElementById('btnFolderModalSubmitLabel');
+    const iconWrap = document.getElementById('folderModalIconWrap');
+
+    if (folderToEdit) {
+      titleEl.textContent = 'Modifier le Dossier';
+      inputEl.value = folderToEdit.name || '';
+      submitLabel.textContent = 'Enregistrer';
+      const col = folderToEdit.color || '#3b82f6';
+      if (iconWrap) {
+        iconWrap.style.background = `${col}22`;
+        iconWrap.style.color = col;
+      }
+      document.querySelectorAll('#folderColorSwatches .swatch-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.color.toLowerCase() === col.toLowerCase());
+      });
+    } else {
+      titleEl.textContent = 'Nouveau Dossier d\'Assets';
+      inputEl.value = '';
+      submitLabel.textContent = 'Créer le dossier';
+      if (iconWrap) {
+        iconWrap.style.background = 'rgba(59, 130, 246, 0.15)';
+        iconWrap.style.color = '#3b82f6';
+      }
+      document.querySelectorAll('#folderColorSwatches .swatch-btn').forEach((b, idx) => {
+        b.classList.toggle('active', idx === 0);
+      });
+    }
+
+    modal.classList.remove('hidden');
+    inputEl.focus();
+  }
+
+  function closeFolderModal() {
+    document.getElementById('folderModal')?.classList.add('hidden');
+    editingFolderId = null;
+  }
+
+  function submitFolderModal() {
+    const inputEl = document.getElementById('txtFolderName');
+    const name = inputEl?.value.trim();
+    if (!name) {
+      showToast('Veuillez saisir un nom pour le dossier');
+      return;
+    }
+    const activeSwatch = document.querySelector('#folderColorSwatches .swatch-btn.active');
+    const color = activeSwatch?.dataset.color || '#3b82f6';
+
+    if (editingFolderId) {
+      socket.emit('folder:rename', { id: editingFolderId, name, color }, (res) => {
+        if (res?.ok) showToast('Dossier mis à jour');
+      });
+    } else {
+      socket.emit('folder:create', { name, color }, (res) => {
+        if (res?.ok) showToast('Dossier créé');
+      });
+    }
+    closeFolderModal();
+  }
+
+  // =========================================================
+  // Conducteur Runtime UI (Rundown / Next Cue System)
+  // =========================================================
+  function updateRundownMasterUI() {
+    const btn = document.getElementById('btnRundownNext');
+    const titleEl = document.getElementById('lblRundownMasterTitle');
+    const subEl = document.getElementById('lblRundownMasterSub');
+    const icoEl = document.getElementById('icoRundownMaster');
+    if (!btn || !titleEl || !subEl || !icoEl) return;
+
+    const isLive = airState.phase !== 'IDLE' && airState.phase !== 'EXITING';
+    const isRundownLive = isLive && rundownState.activeCueId && rundownState.currentIndex >= 0;
+    const nextCue = rundownState.nextCue;
+    const currentCue = rundownState.currentCue;
+
+    if (isRundownLive && currentCue?.asset) {
+      btn.classList.add('is-live-running');
+      icoEl.className = 'fa-solid fa-stop';
+      titleEl.textContent = 'SORTIR / NEXT';
+      subEl.textContent = `À l'antenne : #${currentCue.index + 1} - ${currentCue.asset.primaryText || 'Cue actif'}`;
+    } else if (nextCue?.asset) {
+      btn.classList.remove('is-live-running');
+      icoEl.className = 'fa-solid fa-forward-step';
+      titleEl.textContent = 'NEXT CUE';
+      subEl.textContent = `Prêt : #${nextCue.index + 1} - ${nextCue.asset.primaryText || 'Sans titre'}`;
+    } else if (rundownState.items && rundownState.items.length > 0) {
+      btn.classList.remove('is-live-running');
+      icoEl.className = 'fa-solid fa-arrow-rotate-left';
+      titleEl.textContent = 'RESTART CONDUCTEUR';
+      subEl.textContent = 'Fin du conducteur atteinte (Cue #1 préchargé)';
+    } else {
+      btn.classList.remove('is-live-running');
+      icoEl.className = 'fa-solid fa-forward-step';
+      titleEl.textContent = 'NEXT CUE';
+      subEl.textContent = 'Prêt : Aucun cue dans le conducteur';
+    }
+  }
+
+  function renderRundownUI() {
+    updateRundownMasterUI();
+    updateModeCounts();
+
+    const listEl = document.getElementById('rundownListContainer');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    const items = Array.isArray(rundownState.items) ? rundownState.items : [];
+    if (items.length === 0) {
+      listEl.innerHTML = `
+        <div class="rundown-empty-state">
+          <i class="fa-solid fa-list-check"></i>
+          <strong>Conducteur d'émission vide</strong>
+          <p>Ajoutez des synthés et titres séquentiels avec « + Asset », « + Tout » ou via le bouton conducteur sur chaque asset.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const curIdx = rundownState.currentIndex;
+    const nextIdx = rundownState.nextIndex;
+    const isLive = airState.phase !== 'IDLE' && airState.phase !== 'EXITING';
+
+    items.forEach((cue, idx) => {
+      const isCurrent = idx === curIdx && isLive;
+      const isNext = idx === nextIdx && !isCurrent;
+      const isPassed = curIdx >= 0 && idx < curIdx && !isCurrent;
+
+      const card = document.createElement('div');
+      card.className = [
+        'cue-card',
+        isCurrent ? 'is-active-on-air' : '',
+        isNext ? 'is-primed-next' : '',
+        isPassed ? 'is-passed' : ''
       ]
         .filter(Boolean)
         .join(' ');
-      row.dataset.id = item.id;
-      row.draggable = canDrag;
+      card.dataset.cueId = cue.id;
+      card.dataset.index = idx;
+      card.draggable = true;
 
-      const kindIcon =
-        item.align === 'center' || item.kind === 'titre'
-          ? 'fa-closed-captioning'
-          : 'fa-id-badge';
+      const asset = cue.asset;
+      const kindClass = asset?.kind === 'titre' ? 'titre' : 'synthe';
+      const kindLabel = asset?.kind === 'titre' ? 'TITRE' : 'SYNTHÉ';
 
-      const modeBadge =
-        item.mode === 'auto' ? `AUTO ${item.duration}s` : 'MANUEL';
+      let statusBadgeHtml = '<span class="cue-badge-status status-ready">ATTENTE</span>';
+      if (isCurrent) {
+        statusBadgeHtml = '<span class="cue-badge-status status-live"><i class="fa-solid fa-circle-dot"></i> ON AIR</span>';
+      } else if (isNext) {
+        statusBadgeHtml = '<span class="cue-badge-status status-next"><i class="fa-solid fa-play"></i> PRÊT</span>';
+      } else if (isPassed) {
+        statusBadgeHtml = '<span class="cue-badge-status status-ready">PASSÉ</span>';
+      }
 
-      row.innerHTML = `
-        <span class="asset-swatch" style="background:${item.accentColor || '#FAB001'}"></span>
-        <div class="asset-info">
-          <div class="asset-top-line">
-            <i class="fa-solid ${kindIcon} asset-kind-ico"></i>
-            <span class="asset-primary">${escapeText(item.primaryText || 'Sans titre')}</span>
+      const modeBadge = asset?.mode === 'auto' ? `AUTO ${asset.duration || 4}s` : 'MANUEL';
+
+      card.innerHTML = `
+        <span class="drag-handle" title="Glisser pour réordonner"><i class="fa-solid fa-grip-vertical"></i></span>
+        <span class="cue-num-badge">#${idx + 1}</span>
+        <div class="cue-main-info">
+          <div class="cue-title-row">
+            <span class="cue-badge-type ${kindClass}">${kindLabel}</span>
+            <span class="cue-title">${escapeText(asset?.primaryText || 'Asset introuvable')}</span>
+            ${statusBadgeHtml}
           </div>
-          <div class="asset-meta-line">
-            <span class="asset-secondary">${escapeText(item.secondaryText || (item.kind === 'titre' ? 'Titre centré' : 'Synthé'))}</span>
-            <span class="asset-mode-tag">${isQueued ? 'SUIVANT' : modeBadge}</span>
+          <div class="cue-sub-row">
+            <span>${escapeText(asset?.secondaryText || '')}</span>
+            <span class="asset-mode-tag">${modeBadge}</span>
+            ${cue.note ? `<span class="cue-note" title="Note: ${escapeText(cue.note)}"><i class="fa-regular fa-note-sticky"></i> ${escapeText(cue.note)}</span>` : ''}
           </div>
         </div>
-        <div class="asset-actions">
-          <button type="button" class="btn-row-mini" data-act="dup" title="Dupliquer">
-            <i class="fa-regular fa-clone"></i>
+        <div class="cue-actions">
+          <button type="button" class="cue-btn-action cue-btn-play" data-cue-act="jump" title="Envoyer ce cue immédiatement">
+            <i class="fa-solid fa-play"></i>
           </button>
-          <button type="button" class="btn-row-mini danger" data-act="del" title="Supprimer">
+          <button type="button" class="cue-btn-action" data-cue-act="note" title="Modifier la note de régie">
+            <i class="fa-regular fa-pen-to-square"></i>
+          </button>
+          <button type="button" class="cue-btn-action cue-btn-del" data-cue-act="del" title="Retirer ce cue du conducteur">
             <i class="fa-regular fa-trash-can"></i>
-          </button>
-          <button type="button" class="btn-row-air" data-act="air" title="${isLive ? 'Sortir de l\'antenne' : 'Envoyer en direct'}">
-            <i class="fa-solid ${isLive ? 'fa-stop' : 'fa-play'}"></i>
           </button>
         </div>
       `;
 
-      if (canDrag) {
-        row.addEventListener('dragstart', (e) => {
-          dragSrcId = item.id;
-          row.classList.add('dragging');
-          e.dataTransfer.effectAllowed = 'move';
-        });
-        row.addEventListener('dragend', () => {
-          dragSrcId = null;
-          row.classList.remove('dragging');
-        });
-        row.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-        });
-        row.addEventListener('drop', (e) => {
-          e.preventDefault();
-          if (!dragSrcId || dragSrcId === item.id) return;
-          const ids = assets.map((a) => a.id);
-          const from = ids.indexOf(dragSrcId);
-          const to = ids.indexOf(item.id);
-          if (from < 0 || to < 0) return;
+      card.addEventListener('dragstart', (e) => {
+        dragCueId = cue.id;
+        card.classList.add('is-dragging');
+        e.dataTransfer.setData('text/plain', cue.id);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      card.addEventListener('dragend', () => {
+        dragCueId = null;
+        card.classList.remove('is-dragging');
+      });
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!dragCueId || dragCueId === cue.id) return;
+        const ids = items.map((c) => c.id);
+        const from = ids.indexOf(dragCueId);
+        const to = ids.indexOf(cue.id);
+        if (from >= 0 && to >= 0) {
           ids.splice(from, 1);
-          ids.splice(to, 0, dragSrcId);
-          socket.emit('asset:reorder', ids);
-        });
-      }
+          ids.splice(to, 0, dragCueId);
+          socket.emit('rundown:reorder', ids);
+        }
+      });
 
-      listEl.appendChild(row);
+      listEl.appendChild(card);
+    });
+  }
+
+  // =========================================================
+  // Video Export (.MOV QuickTime Alpha ProRes / RLE)
+  // =========================================================
+  function openExportVideoModal(asset = null) {
+    const target = asset || draft || (assets.length > 0 ? assets[0] : null);
+    if (!target) {
+      showToast('Aucun asset à exporter');
+      return;
     }
+    activeExportAsset = clone(target);
+
+    const modal = document.getElementById('exportVideoModal');
+    const titleEl = document.getElementById('exportAssetTitle');
+    const metaEl = document.getElementById('exportAssetMeta');
+    const holdSecInput = document.getElementById('exportHoldSec');
+    const fpsSelect = document.getElementById('exportFps');
+    const codecSelect = document.getElementById('exportCodec');
+
+    if (titleEl) titleEl.textContent = target.primaryText || 'Sans titre';
+    if (metaEl) {
+      metaEl.textContent = `${target.kind === 'titre' ? 'Titre centré' : 'Synthé'} • ${target.animStyle || 'Animation standard'} • 1920×1080 Transparent`;
+    }
+
+    const defaultHold =
+      target.mode === 'auto' && target.duration > 0
+        ? Math.max(1, Math.min(30, target.duration))
+        : 4.0;
+    if (holdSecInput) holdSecInput.value = defaultHold;
+    if (fpsSelect) fpsSelect.value = '50';
+    if (codecSelect) codecSelect.value = 'prores';
+
+    document.getElementById('exportSettingsForm')?.classList.remove('hidden');
+    document.getElementById('exportProgressSection')?.classList.add('hidden');
+    document.getElementById('exportResultSection')?.classList.add('hidden');
+    document.getElementById('btnStartExportVideo')?.classList.remove('hidden');
+    document.getElementById('btnRevealExportFile')?.classList.add('hidden');
+    document.getElementById('btnDownloadExportFile')?.classList.add('hidden');
+
+    updateExportCalculations();
+    modal.classList.remove('hidden');
+  }
+
+  function closeExportVideoModal() {
+    clearInterval(exportIntervalTimer);
+    document.getElementById('exportVideoModal')?.classList.add('hidden');
+    activeExportAsset = null;
+    currentExportJobId = null;
+  }
+
+  function updateExportCalculations() {
+    if (!activeExportAsset) return;
+    const holdSec = parseFloat(document.getElementById('exportHoldSec')?.value || '4') || 4;
+    const fps = parseInt(document.getElementById('exportFps')?.value || '50', 10) || 50;
+
+    const valEl = document.getElementById('exportHoldSecVal');
+    if (valEl) valEl.textContent = `${holdSec.toFixed(1)} s`;
+
+    const speed = Math.min(2.2, Math.max(0.4, Number(activeExportAsset.animSpeed) || 1));
+    const inDur = Number((0.6 / speed).toFixed(2));
+    const outDur = Number((0.5 / speed).toFixed(2));
+    const totalDur = Number((inDur + holdSec + outDur).toFixed(2));
+    const totalFrames = Math.ceil(totalDur * fps);
+
+    document.getElementById('exportCalcIn').textContent = `${inDur.toFixed(2)} s`;
+    document.getElementById('exportCalcHold').textContent = `${holdSec.toFixed(2)} s`;
+    document.getElementById('exportCalcOut').textContent = `${outDur.toFixed(2)} s`;
+    document.getElementById('exportCalcTotal').textContent = `${totalDur.toFixed(2)} s (${totalFrames} images @ ${fps} fps)`;
+  }
+
+  async function startExportVideoProcess() {
+    if (!activeExportAsset) return;
+    const holdSec = parseFloat(document.getElementById('exportHoldSec')?.value || '4') || 4;
+    const fps = parseInt(document.getElementById('exportFps')?.value || '50', 10) || 50;
+    const codec = document.getElementById('exportCodec')?.value || 'prores';
+
+    const formEl = document.getElementById('exportSettingsForm');
+    const progEl = document.getElementById('exportProgressSection');
+    const resEl = document.getElementById('exportResultSection');
+    const btnStart = document.getElementById('btnStartExportVideo');
+    const btnCancel = document.getElementById('btnCancelExportVideo');
+
+    formEl.classList.add('hidden');
+    progEl.classList.remove('hidden');
+    resEl.classList.add('hidden');
+    btnStart.classList.add('hidden');
+    if (btnCancel) btnCancel.disabled = true;
+
+    exportStartTime = Date.now();
+    const estTotalFrames = Math.ceil((1.1 + holdSec) * fps);
+    updateExportProgressUI({
+      percent: 0,
+      currentFrame: 0,
+      totalFrames: estTotalFrames,
+      message: 'Initialisation du moteur de rendu transparent...'
+    });
+
+    clearInterval(exportIntervalTimer);
+    exportIntervalTimer = setInterval(() => {
+      const elapsed = ((Date.now() - exportStartTime) / 1000).toFixed(1);
+      const timeEl = document.getElementById('exportStatTime');
+      if (timeEl) timeEl.textContent = `${elapsed}s`;
+    }, 200);
+
+    // 1. Electron Desktop Native Capture
+    if (window.electronAPI && typeof window.electronAPI.exportMovVideo === 'function') {
+      try {
+        const result = await window.electronAPI.exportMovVideo(activeExportAsset, {
+          holdSec,
+          fps,
+          codec,
+          onProgress: (prog) => {
+            updateExportProgressUI(prog);
+          }
+        });
+
+        clearInterval(exportIntervalTimer);
+        if (btnCancel) btnCancel.disabled = false;
+
+        if (result && result.ok && result.outputPath) {
+          showExportSuccess(result.outputPath, true);
+        } else {
+          showToast(result?.error || 'Échec de l\'exportation');
+          formEl.classList.remove('hidden');
+          progEl.classList.add('hidden');
+          btnStart.classList.remove('hidden');
+        }
+      } catch (err) {
+        clearInterval(exportIntervalTimer);
+        if (btnCancel) btnCancel.disabled = false;
+        showToast(`Erreur d'export : ${err.message}`);
+        formEl.classList.remove('hidden');
+        progEl.classList.add('hidden');
+        btnStart.classList.remove('hidden');
+      }
+      return;
+    }
+
+    // 2. Web Browser Fallback (Server endpoint)
+    try {
+      const res = await fetch('/api/export-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset: activeExportAsset,
+          assetId: activeExportAsset.id,
+          holdSec,
+          fps,
+          codec
+        })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.error || 'Erreur du serveur d\'export');
+      }
+      currentExportJobId = data.jobId;
+    } catch (err) {
+      clearInterval(exportIntervalTimer);
+      if (btnCancel) btnCancel.disabled = false;
+      showToast(`Erreur d'export : ${err.message}`);
+      formEl.classList.remove('hidden');
+      progEl.classList.add('hidden');
+      btnStart.classList.remove('hidden');
+    }
+  }
+
+  function updateExportProgressUI(prog) {
+    if (!prog) return;
+    const pct = Math.max(0, Math.min(100, Math.round(prog.percent || 0)));
+    const pctEl = document.getElementById('exportProgressPercent');
+    const fillEl = document.getElementById('exportProgressBarFill');
+    if (pctEl) pctEl.textContent = `${pct}%`;
+    if (fillEl) fillEl.style.width = `${pct}%`;
+
+    if (prog.message) {
+      const msgEl = document.getElementById('exportProgressStatusTitle');
+      if (msgEl) msgEl.textContent = prog.message;
+    }
+    if (prog.totalFrames) {
+      const framesEl = document.getElementById('exportStatFrames');
+      const subEl = document.getElementById('exportProgressStatusSub');
+      if (framesEl) framesEl.textContent = `${prog.currentFrame || 0} / ${prog.totalFrames} images`;
+      if (subEl) subEl.textContent = `Rendu image ${prog.currentFrame || 0} sur ${prog.totalFrames}...`;
+    }
+    if (prog.fps) {
+      const spdEl = document.getElementById('exportStatSpeed');
+      if (spdEl) spdEl.textContent = `${prog.fps} fps`;
+    }
+  }
+
+  function showExportSuccess(outputPath, isElectron = false) {
+    const progEl = document.getElementById('exportProgressSection');
+    const resEl = document.getElementById('exportResultSection');
+    const pathEl = document.getElementById('exportResultFilePath');
+    const btnReveal = document.getElementById('btnRevealExportFile');
+    const btnDownload = document.getElementById('btnDownloadExportFile');
+    const btnCancel = document.getElementById('btnCancelExportVideo');
+
+    progEl.classList.add('hidden');
+    resEl.classList.remove('hidden');
+    if (pathEl) pathEl.textContent = outputPath;
+
+    if (isElectron) {
+      btnReveal.classList.remove('hidden');
+      btnReveal.onclick = () => {
+        if (window.electronAPI?.showItemInFolder) {
+          window.electronAPI.showItemInFolder(outputPath);
+        }
+      };
+    } else {
+      btnDownload.classList.remove('hidden');
+      btnDownload.href = outputPath;
+    }
+    if (btnCancel) btnCancel.disabled = false;
+    showToast('Exportation vidéo .MOV terminée avec succès !');
   }
 
   function escapeText(str) {
@@ -3028,6 +3628,101 @@
       renderAssetList();
     });
 
+    // Left Panel Mode Switcher (Assets vs Conducteur)
+    document.getElementById('btnTabAssets')?.addEventListener('click', () => switchLeftTab('assets'));
+    document.getElementById('btnTabRundown')?.addEventListener('click', () => switchLeftTab('rundown'));
+
+    // Create Folder Modal & Interactions
+    document.getElementById('btnNewFolder')?.addEventListener('click', () => openFolderModal(null));
+    document.getElementById('btnFolderModalCancel')?.addEventListener('click', closeFolderModal);
+    document.getElementById('folderModalBackdrop')?.addEventListener('click', closeFolderModal);
+    document.getElementById('btnFolderModalSubmit')?.addEventListener('click', submitFolderModal);
+
+    document.querySelectorAll('#folderColorSwatches .swatch-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#folderColorSwatches .swatch-btn').forEach((b) => b.classList.toggle('active', b === btn));
+        const col = btn.dataset.color;
+        const iconWrap = document.getElementById('folderModalIconWrap');
+        if (iconWrap && col) {
+          iconWrap.style.background = `${col}22`;
+          iconWrap.style.color = col;
+        }
+      });
+    });
+
+    // Conducteur (Rundown) Buttons
+    document.getElementById('btnRundownNext')?.addEventListener('click', () => {
+      socket.emit('rundown:next');
+    });
+
+    document.getElementById('btnRundownReset')?.addEventListener('click', () => {
+      socket.emit('rundown:reset');
+      showToast('Conducteur réinitialisé au début');
+    });
+
+    document.getElementById('btnRundownAddDraft')?.addEventListener('click', () => {
+      if (!draft) {
+        showToast('Aucun asset sélectionné');
+        return;
+      }
+      socket.emit('rundown:addItem', { assetId: draft.id }, (res) => {
+        if (res?.ok) showToast('Asset ajouté au conducteur');
+      });
+    });
+
+    document.getElementById('btnRundownAddAll')?.addEventListener('click', () => {
+      if (assets.length === 0) {
+        showToast('Aucun asset dans le profil');
+        return;
+      }
+      const ids = assets.map((a) => a.id);
+      socket.emit('rundown:addMany', { assetIds: ids }, (res) => {
+        if (res?.ok) showToast(`${ids.length} assets ajoutés au conducteur`);
+      });
+    });
+
+    document.getElementById('btnRundownClear')?.addEventListener('click', () => {
+      const ok = confirm('Vider tous les cues du conducteur ?');
+      if (ok) {
+        socket.emit('rundown:clear');
+        showToast('Conducteur vidé');
+      }
+    });
+
+    // Rundown List Container Click Delegations
+    document.getElementById('rundownListContainer')?.addEventListener('click', (e) => {
+      const actBtn = e.target.closest('[data-cue-act]');
+      if (!actBtn) return;
+      e.stopPropagation();
+      const card = actBtn.closest('.cue-card');
+      const cueId = card?.dataset.cueId;
+      const idx = parseInt(card?.dataset.index, 10);
+      const act = actBtn.dataset.cueAct;
+
+      if (act === 'jump') {
+        socket.emit('rundown:jump', { index: idx });
+      } else if (act === 'note') {
+        const item = rundownState.items?.find((c) => c.id === cueId);
+        const note = prompt('Note de régie pour ce cue :', item?.note || '');
+        if (note !== null) {
+          socket.emit('rundown:updateNote', { cueId, note });
+        }
+      } else if (act === 'del') {
+        socket.emit('rundown:removeItem', cueId);
+      }
+    });
+
+    // Video Export Modal (.MOV Alpha)
+    document.getElementById('btnExportMov')?.addEventListener('click', () => openExportVideoModal(draft));
+    document.getElementById('btnFsExportMov')?.addEventListener('click', () => openExportVideoModal(draft));
+    document.getElementById('btnCancelExportVideo')?.addEventListener('click', closeExportVideoModal);
+    document.getElementById('exportVideoBackdrop')?.addEventListener('click', closeExportVideoModal);
+    document.getElementById('btnStartExportVideo')?.addEventListener('click', startExportVideoProcess);
+
+    document.getElementById('exportHoldSec')?.addEventListener('input', updateExportCalculations);
+    document.getElementById('exportFps')?.addEventListener('change', updateExportCalculations);
+    document.getElementById('exportCodec')?.addEventListener('change', updateExportCalculations);
+
     // Create Synthé / Titre
     document.getElementById('btnNewSynthe').addEventListener('click', () => {
       guardUnsavedChanges(() => {
@@ -3076,8 +3771,42 @@
       renderGalleryCards();
     });
 
-    // Asset list interactions
+    // Asset list and folders interactions
     document.getElementById('assetList').addEventListener('click', (e) => {
+      // 1. Folder Header actions
+      const folderHeader = e.target.closest('.folder-header');
+      const folderActBtn = e.target.closest('[data-folder-act]');
+
+      if (folderActBtn) {
+        e.stopPropagation();
+        const folderEl = folderActBtn.closest('.asset-folder');
+        const folderId = folderEl?.dataset.folderId;
+        const folder = folders.find((f) => f.id === folderId);
+        if (!folder) return;
+        const act = folderActBtn.dataset.folderAct;
+        if (act === 'edit') {
+          openFolderModal(folder);
+        } else if (act === 'del') {
+          const ok = confirm(`Supprimer le dossier « ${folder.name} » ?\nLes assets contenus seront conservés hors dossier.`);
+          if (ok) {
+            socket.emit('folder:delete', { id: folder.id, deleteAssets: false });
+          }
+        }
+        return;
+      }
+
+      if (folderHeader) {
+        const folderEl = folderHeader.closest('.asset-folder');
+        const folderId = folderEl?.dataset.folderId;
+        const folder = folders.find((f) => f.id === folderId);
+        if (folder) {
+          const isCollapsed = folderEl.classList.toggle('collapsed');
+          socket.emit('folder:toggleCollapse', { id: folder.id, collapsed: isCollapsed });
+        }
+        return;
+      }
+
+      // 2. Asset item actions
       const row = e.target.closest('.asset-item');
       if (!row) return;
       const id = row.dataset.id;
@@ -3102,6 +3831,10 @@
             const payload = id === selectedId && draft ? draft : item;
             socket.emit('air:take', { asset: payload });
           }
+        } else if (act === 'rnd') {
+          socket.emit('rundown:addItem', { assetId: id }, (res) => {
+            if (res?.ok) showToast('Asset ajouté au conducteur');
+          });
         } else if (act === 'dup') {
           socket.emit('asset:duplicate', id, (res) => {
             if (res?.asset) {
@@ -4022,6 +4755,25 @@
         return;
       }
 
+      const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
+      if (folderModalOpen) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeFolderModal();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          submitFolderModal();
+        }
+        return;
+      }
+
+      const exportModalOpen = !document.getElementById('exportVideoModal').classList.contains('hidden');
+      if (exportModalOpen && e.key === 'Escape') {
+        e.preventDefault();
+        closeExportVideoModal();
+        return;
+      }
+
       // Undo (Cmd/Ctrl+Z) & Redo (Cmd+Shift+Z or Ctrl+Y)
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -4082,7 +4834,7 @@
         return;
       }
 
-      if (inInput || modalOpen || profilesOpen || unsavedOpen || settingsOpen || updPromptOpen) return;
+      if (inInput || modalOpen || folderModalOpen || exportModalOpen || profilesOpen || unsavedOpen || settingsOpen || updPromptOpen) return;
 
       if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
@@ -4092,7 +4844,11 @@
 
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
-        if (draft) socket.emit('air:take', { asset: draft });
+        if (activeLeftTab === 'rundown' && e.key === ' ') {
+          socket.emit('rundown:next');
+        } else if (draft) {
+          socket.emit('air:take', { asset: draft });
+        }
       } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         if (assets.length === 0) return;
@@ -4141,7 +4897,74 @@
     if (!state) return;
     profiles = Array.isArray(state.profiles) ? state.profiles : [];
     activeProfileId = state.activeProfileId || (profiles[0] && profiles[0].id) || null;
+    folders = Array.isArray(state.folders) ? state.folders : [];
     renderProfilesUI();
+    renderAssetList();
+  });
+
+  socket.on('rundown:state', (state) => {
+    if (!state) return;
+    rundownState = state;
+    renderRundownUI();
+  });
+
+  socket.on('update:progress', (data) => {
+    if (!data) return;
+    const settingsBox = document.getElementById('settingsUpdateProgress');
+    const promptBox = document.getElementById('promptUpdateProgress');
+
+    const pct = Math.max(0, Math.min(100, Math.round(data.percent || 0)));
+    const pctStr = `${pct}%`;
+    const msg = data.message || (data.done ? 'Téléchargement terminé !' : 'Téléchargement en cours...');
+
+    const dlMb = ((data.downloadedBytes || 0) / (1024 * 1024)).toFixed(1);
+    const totMb = ((data.totalBytes || 0) / (1024 * 1024)).toFixed(1);
+    const bytesStr = data.totalBytes > 0 ? `${dlMb} Mo / ${totMb} Mo` : `${dlMb} Mo`;
+
+    let speedStr = '-- Mo/s';
+    if (data.speedBytesPerSec > 0) {
+      speedStr = `${(data.speedBytesPerSec / (1024 * 1024)).toFixed(1)} Mo/s`;
+    }
+
+    [settingsBox, promptBox].forEach((box) => {
+      if (!box) return;
+      box.classList.remove('hidden');
+      const msgEl = box.querySelector('.update-progress-msg');
+      const pctEl = box.querySelector('.update-progress-pct');
+      const fillEl = box.querySelector('.update-progress-fill');
+      const metaSpan1 = box.querySelector('.update-progress-meta span:first-child');
+      const metaSpan2 = box.querySelector('.update-progress-meta span:last-child');
+      if (msgEl) msgEl.textContent = msg;
+      if (pctEl) pctEl.textContent = pctStr;
+      if (fillEl) fillEl.style.width = pctStr;
+      if (metaSpan1) metaSpan1.textContent = bytesStr;
+      if (metaSpan2) metaSpan2.textContent = speedStr;
+    });
+  });
+
+  socket.on('export:progress', (data) => {
+    if (data?.jobId && data.jobId === currentExportJobId) {
+      updateExportProgressUI(data);
+    }
+  });
+
+  socket.on('export:done', (data) => {
+    if (data?.jobId && data.jobId === currentExportJobId) {
+      clearInterval(exportIntervalTimer);
+      showExportSuccess(data.downloadUrl, false);
+    }
+  });
+
+  socket.on('export:error', (data) => {
+    if (data?.jobId && data.jobId === currentExportJobId) {
+      clearInterval(exportIntervalTimer);
+      const btnCancel = document.getElementById('btnCancelExportVideo');
+      if (btnCancel) btnCancel.disabled = false;
+      showToast(`Échec de l'export vidéo : ${data.error || 'Erreur inconnue'}`);
+      document.getElementById('exportSettingsForm')?.classList.remove('hidden');
+      document.getElementById('exportProgressSection')?.classList.add('hidden');
+      document.getElementById('btnStartExportVideo')?.classList.remove('hidden');
+    }
   });
 
   socket.on('assets:list', (serverAssets) => {
@@ -4175,7 +4998,9 @@
     updateOverlayCount(state.overlayClients || 0);
     updateVersionAndStreamDeckUI(state);
     updateAirStatusUI();
+    updateRundownMasterUI();
     renderAssetList();
+    renderRundownUI();
 
     if (!pgmInitialized) {
       pgmInitialized = true;
