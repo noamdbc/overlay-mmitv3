@@ -25797,7 +25797,7 @@ Object.assign(lookup, {
 
 // src/bridge.js
 var DEFAULT_SERVER_URL = "http://localhost:3000";
-var PLUGIN_VERSION = true ? "1.1.1" : "1.0.0";
+var PLUGIN_VERSION = true ? "1.2.0" : "1.0.0";
 var OverlayBridge = class {
   constructor() {
     this.serverUrl = DEFAULT_SERVER_URL;

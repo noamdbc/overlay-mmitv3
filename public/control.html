@@ -17,7 +17,7 @@
         <div class="brand-mark">
           <span class="brand-dot"></span>
           <span class="brand-title">OVERLAY RÉGIE</span>
-          <span id="topVersionBadge" class="ver-badge">v1.1.1</span>
+          <span id="topVersionBadge" class="ver-badge">v1.2.0</span>
         </div>
 
         <div id="airBadge" class="air-badge is-idle">
@@ -127,6 +127,9 @@
         <div id="assetList" class="asset-list"></div>
       </aside>
 
+      <!-- LEFT DRAGGABLE RESIZER -->
+      <div id="resizerLeft" class="panel-resizer resizer-left" title="Glisser pour régler la largeur (Double-clic : largeur par défaut)"></div>
+
       <!-- CENTER: DUAL 1920x1080 MONITORS (PVW + PGM) & TRANSPORT -->
       <section class="panel-center">
         <div class="monitors-grid">
@@ -149,6 +152,9 @@
                 </button>
                 <button id="btnCycleBg" class="btn-tool" title="Fond de simulation (aperçu uniquement)">
                   <i class="fa-solid fa-chess-board"></i>
+                </button>
+                <button id="btnOpenFsPreview" class="btn-tool btn-tool-fs" title="Aperçu Plein Écran avec Timeline interactive (Touche F)">
+                  <i class="fa-solid fa-expand"></i> Plein écran
                 </button>
               </div>
             </div>
@@ -243,6 +249,9 @@
           </div>
         </div>
       </section>
+
+      <!-- RIGHT DRAGGABLE RESIZER -->
+      <div id="resizerRight" class="panel-resizer resizer-right" title="Glisser pour régler la largeur (Double-clic : largeur par défaut)"></div>
 
       <!-- RIGHT: COMPLETE CUSTOMIZATION INSPECTOR -->
       <aside id="panelRight" class="panel panel-inspector">
@@ -1016,6 +1025,105 @@
         </a>
         <button type="button" id="btnUpdPromptLater" class="btn-sec">
           Plus tard
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULLSCREEN MOTION PREVIEW & INTERACTIVE TIMELINE MODAL -->
+  <div id="fsPreviewModal" class="fs-preview-modal hidden" role="dialog" aria-modal="true">
+    <div class="fs-header">
+      <div class="fs-header-left">
+        <span class="tag-pvw">APERÇU PLEIN ÉCRAN 1920×1080</span>
+        <span id="fsAssetTitle" class="fs-asset-title">—</span>
+        <span id="fsAssetSpecs" class="fs-asset-specs">—</span>
+      </div>
+      <div class="fs-header-right">
+        <button type="button" id="btnFsToggleSafe" class="btn-sec" title="Afficher / Masquer la grille Safe Area TV">
+          <i class="fa-solid fa-border-none"></i> <span>Safe Area</span>
+        </button>
+        <button type="button" id="btnFsCycleBg" class="btn-sec" title="Changer le fond de simulation">
+          <i class="fa-solid fa-chess-board"></i> <span>Fond</span>
+        </button>
+        <button type="button" id="btnFsTakeAir" class="btn-broadcast btn-take" title="Envoyer cet asset directement à l'antenne">
+          <i class="fa-solid fa-play"></i> <span>ENVOYER EN DIRECT</span>
+        </button>
+        <button type="button" id="btnCloseFsPreview" class="btn-close-gallery" title="Fermer l'aperçu plein écran (Échap)">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <div id="fsViewport" class="fs-viewport-wrap">
+      <div id="fsScaler" class="stage-scaler bg-dark-studio">
+        <div id="fsStage" class="ov-stage"></div>
+        <div id="fsSafeGuides" class="safe-guides">
+          <div class="safe-action"></div>
+          <div class="safe-title"></div>
+          <div class="safe-cross-v"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOTION DESIGN TIMELINE & SCRUBBER BAR -->
+    <div class="fs-timeline-bar">
+      <div class="fs-transport-btns">
+        <button type="button" id="btnFsRestart" class="btn-sec btn-icon-sq" title="Retour au début (0.00s)">
+          <i class="fa-solid fa-backward-step"></i>
+        </button>
+        <button type="button" id="btnFsStepBack" class="btn-sec btn-icon-sq" title="Reculer d'une image (-1 frame / Flèche Gauche)">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <button type="button" id="btnFsPlayPause" class="btn-broadcast btn-take btn-fs-play" title="Lecture / Pause de la timeline (Espace)">
+          <i id="icoFsPlayPause" class="fa-solid fa-pause"></i>
+          <span id="lblFsPlayPause">PAUSE</span>
+        </button>
+        <button type="button" id="btnFsStepFwd" class="btn-sec btn-icon-sq" title="Avancer d'une image (+1 frame / Flèche Droite)">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+
+      <div class="fs-phase-jumps">
+        <button type="button" id="btnFsJumpIn" class="btn-tool active" title="Aller au début de l'animation d'entrée">
+          ENTRÉE
+        </button>
+        <button type="button" id="btnFsJumpHold" class="btn-tool" title="Aller à l'état stable à l'antenne (Maintien)">
+          MAINTIEN
+        </button>
+        <button type="button" id="btnFsJumpOut" class="btn-tool" title="Aller au début de l'animation de sortie">
+          SORTIE
+        </button>
+      </div>
+
+      <div class="fs-scrubber-col">
+        <div class="fs-segments-bar">
+          <div id="fsSegIn" class="fs-seg fs-seg-in" style="width: 30%"><span>IN</span></div>
+          <div id="fsSegHold" class="fs-seg fs-seg-hold" style="width: 48%"><span>ON AIR</span></div>
+          <div id="fsSegOut" class="fs-seg fs-seg-out" style="width: 22%"><span>OUT</span></div>
+        </div>
+        <input type="range" id="rngFsTimeline" class="inp-range fs-timeline-range" min="0" max="1000" step="1" value="0">
+      </div>
+
+      <div class="fs-timecode-box">
+        <span id="fsPhaseBadge" class="fs-phase-badge phase-in">ENTRÉE</span>
+        <div class="fs-time-digits">
+          <span id="fsTimeCurrent">0.00s</span>
+          <span class="fs-time-sep">/</span>
+          <span id="fsTimeTotal">2.60s</span>
+          <span id="fsFrameCounter" class="fs-frame-pill">000f</span>
+        </div>
+      </div>
+
+      <div class="fs-playback-opts">
+        <select id="selFsSpeed" class="inp-select fs-speed-select" title="Vitesse de lecture">
+          <option value="0.25">0.25x (Ralenti)</option>
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1.0x (Temps réel)</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2.0x</option>
+        </select>
+        <button type="button" id="btnFsLoop" class="btn-sec btn-icon-sq active-loop" title="Lecture en boucle continue">
+          <i class="fa-solid fa-repeat"></i>
         </button>
       </div>
     </div>

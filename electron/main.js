@@ -476,6 +476,11 @@ function buildNativeAppMenu() {
           click: () => sendMenuAction('toggle-safe-guides')
         },
         {
+          label: 'Aperçu Plein Écran & Timeline Animation…',
+          accelerator: 'CmdOrCtrl+Shift+F',
+          click: () => sendMenuAction('open-fs-preview')
+        },
+        {
           label: 'Galerie de Templates & Thèmes (36+)',
           accelerator: 'CmdOrCtrl+G',
           click: () => sendMenuAction('open-gallery')

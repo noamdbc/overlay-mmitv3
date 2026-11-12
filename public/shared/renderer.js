@@ -883,7 +883,7 @@
           tl.fromTo(
             wipeTarget,
             { clipPath: clipClosed },
-            { clipPath: clipOpen, duration: 0.54 * speed, ease: 'expo.out', clearProps: 'clipPath' },
+            { clipPath: clipOpen, duration: 0.54 * speed, ease: 'expo.out' },
             0.06 * speed
           );
         }
@@ -918,7 +918,7 @@
           tl.fromTo(
             wipeTarget,
             { clipPath: clipClosed, x: align === 'right' ? 24 : -24 },
-            { clipPath: clipOpen, x: 0, duration: 0.62 * speed, ease: backSoft, clearProps: 'clipPath' },
+            { clipPath: clipOpen, x: 0, duration: 0.62 * speed, ease: backSoft },
             0.12 * speed
           );
         }
@@ -1078,7 +1078,7 @@
           tl.fromTo(
             wipeTarget,
             { clipPath: clipClosed },
-            { clipPath: clipOpen, duration: 0.82 * speed, ease: 'power4.out', clearProps: 'clipPath' },
+            { clipPath: clipOpen, duration: 0.82 * speed, ease: 'power4.out' },
             0.04 * speed
           );
         }
@@ -1141,6 +1141,135 @@
         if (pText) tl.fromTo(pText, { yPercent: 120 }, { yPercent: 0, duration: 0.5 * speed, ease: backSoft }, 0.18 * speed);
         if (sText) tl.fromTo(sText, { yPercent: 120 }, { yPercent: 0, duration: 0.5 * speed, ease: backSoft }, 0.25 * speed);
       }
+
+      return tl;
+    }
+
+    buildFullCycleTimeline(asset, holdSec = 1.5, callbacks = {}) {
+      const gsap = global.gsap;
+      if (!gsap || !asset) return null;
+
+      this.playIn(asset);
+      const tl = this.tl;
+      if (!tl) return null;
+
+      // Remove default onComplete so scrubbing back and forth never spawns separate idle loops
+      tl.eventCallback('onComplete', () => {
+        if (typeof callbacks.onComplete === 'function') callbacks.onComplete();
+      });
+      if (typeof callbacks.onUpdate === 'function') {
+        tl.eventCallback('onUpdate', callbacks.onUpdate);
+      }
+
+      const el = this.currentAnchor;
+      const inDuration = Math.max(0.2, tl.duration());
+      const holdDuration = Math.max(0.3, Number(holdSec) || 1.5);
+      const outStart = inDuration + holdDuration;
+
+      const speed = Math.min(2.2, Math.max(0.4, Number(asset?.animSpeed) || 1));
+      const dir = ['bottom', 'left', 'right', 'top', 'scale'].includes(asset?.animDirection)
+        ? asset.animDirection
+        : 'bottom';
+      const rig = el.querySelector('.ov-motion-rig');
+      const pText = el.querySelector('.ov-anim-p-text');
+      const sText = el.querySelector('.ov-anim-s-text');
+      const secondaryPlate = el.querySelector('.ov-secondary-plate');
+      const tag = el.querySelector('.ov-tag');
+      const decorLayer = el.querySelector('.ov-decor-layer');
+      const layout = rig?.dataset.layout || 'layered';
+      const travel = this.getOffscreenTravel(el, asset);
+
+      if (decorLayer) {
+        tl.fromTo(
+          decorLayer,
+          { scale: 1, y: 0 },
+          { scale: 0.5, y: 15, duration: 0.18 * speed, ease: 'power2.in', immediateRender: false },
+          outStart
+        );
+      }
+      if (tag) {
+        tl.fromTo(
+          tag,
+          { yPercent: 0 },
+          { yPercent: 115, duration: 0.16 * speed, ease: 'power2.in', immediateRender: false },
+          outStart
+        );
+      }
+      if (sText) {
+        tl.fromTo(
+          sText,
+          { yPercent: 0 },
+          { yPercent: 115, duration: 0.18 * speed, ease: 'power2.in', immediateRender: false },
+          outStart
+        );
+      }
+      if (secondaryPlate && layout !== 'minimal' && layout !== 'split') {
+        tl.fromTo(
+          secondaryPlate,
+          { y: 0, scale: 1 },
+          { y: -12, scale: 0.92, duration: 0.22 * speed, ease: 'power2.in', immediateRender: false },
+          outStart + 0.02 * speed
+        );
+      }
+      if (pText) {
+        tl.fromTo(
+          pText,
+          { yPercent: 0 },
+          { yPercent: 110, duration: 0.22 * speed, ease: 'power2.in', immediateRender: false },
+          outStart + 0.05 * speed
+        );
+      }
+
+      if (dir === 'left' || dir === 'right') {
+        const outX = dir === 'right' ? travel.x : -travel.x;
+        tl.fromTo(
+          rig,
+          { x: 0, skewX: 0 },
+          { x: dir === 'right' ? -12 : 12, duration: 0.1 * speed, ease: 'power2.out', immediateRender: false },
+          outStart
+        );
+        tl.to(
+          rig,
+          { x: outX, skewX: dir === 'right' ? -14 : 14, duration: 0.34 * speed, ease: 'power3.in' },
+          outStart + 0.1 * speed
+        );
+      } else if (dir === 'scale') {
+        tl.fromTo(
+          rig,
+          { scale: 1, y: 0 },
+          { scale: 1.06, duration: 0.1 * speed, ease: 'power2.out', immediateRender: false },
+          outStart
+        );
+        tl.to(
+          rig,
+          { scale: 0, y: 40, duration: 0.32 * speed, ease: 'back.in(1.6)' },
+          outStart + 0.1 * speed
+        );
+      } else {
+        const outY = dir === 'top' ? -travel.y : travel.y;
+        tl.fromTo(
+          rig,
+          { y: 0, scaleY: 1 },
+          { y: dir === 'top' ? 9 : -9, duration: 0.11 * speed, ease: 'power2.out', immediateRender: false },
+          outStart
+        );
+        tl.to(
+          rig,
+          { y: outY, scaleY: 1.04, duration: 0.34 * speed, ease: 'power3.in' },
+          outStart + 0.11 * speed
+        );
+      }
+
+      const totalDuration = tl.duration();
+      const outDuration = Math.max(0.15, totalDuration - outStart);
+
+      return {
+        tl,
+        inDuration,
+        holdDuration,
+        outDuration,
+        totalDuration
+      };
     }
 
     playOut(onComplete) {
