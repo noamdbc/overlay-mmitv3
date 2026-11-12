@@ -784,6 +784,54 @@ function checkGitHubRelease() {
   });
 }
 
+function downloadFileWithRedirects(url, destPath, maxRedirects = 6) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) {
+      return reject(new Error('Trop de redirections HTTP'));
+    }
+    const req = https.get(
+      url,
+      {
+        headers: {
+          'User-Agent': `OverlayRegie/${APP_VERSION}`
+        },
+        timeout: 60000
+      },
+      (res) => {
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          res.resume();
+          return resolve(
+            downloadFileWithRedirects(res.headers.location, destPath, maxRedirects - 1)
+          );
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error(`Statut téléchargement HTTP ${res.statusCode}`));
+        }
+        const fileStream = fs.createWriteStream(destPath);
+        res.pipe(fileStream);
+        fileStream.on('finish', () => {
+          fileStream.close(() => resolve(destPath));
+        });
+        fileStream.on('error', (err) => {
+          fs.rmSync(destPath, { force: true });
+          reject(err);
+        });
+      }
+    );
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Délai dépassé lors du téléchargement'));
+    });
+  });
+}
+
 app.get('/api/info', (_req, res) => {
   const ips = getLanAddresses();
   const sdInfo = getStreamDeckStatus();
@@ -806,6 +854,110 @@ app.get('/api/info', (_req, res) => {
 app.get('/api/check-update', async (_req, res) => {
   const result = await checkGitHubRelease();
   res.json(result);
+});
+
+app.post('/api/install-update', async (_req, res) => {
+  try {
+    const release = await checkGitHubRelease();
+    if (!release.ok) {
+      return res.status(400).json({ ok: false, error: release.error || 'Release inaccessible' });
+    }
+
+    const { execFileSync, spawn } = require('child_process');
+    const tmpDir = os.tmpdir();
+
+    if (process.platform === 'darwin') {
+      const dmgUrl = release.assets?.dmg;
+      if (!dmgUrl) {
+        return res.status(404).json({ ok: false, error: 'Aucun fichier .dmg trouvé dans la release' });
+      }
+      const dmgPath = path.join(tmpDir, `Overlay-Regie-v${release.latestVersion}.dmg`);
+      const mountPoint = path.join(tmpDir, `overlay_regie_mnt_${Date.now()}`);
+
+      await downloadFileWithRedirects(dmgUrl, dmgPath);
+
+      try {
+        execFileSync('xattr', ['-cr', dmgPath]);
+      } catch (_e) {
+        // ignore
+      }
+
+      fs.mkdirSync(mountPoint, { recursive: true });
+      execFileSync('hdiutil', ['attach', dmgPath, '-nobrowse', '-readonly', '-mountpoint', mountPoint]);
+
+      try {
+        const mountedApp = path.join(mountPoint, 'Overlay Regie.app');
+        const targetApp = '/Applications/Overlay Regie.app';
+        if (fs.existsSync(mountedApp)) {
+          fs.rmSync(targetApp, { recursive: true, force: true });
+          execFileSync('cp', ['-R', mountedApp, targetApp]);
+          try {
+            execFileSync('xattr', ['-cr', targetApp]);
+            execFileSync('codesign', ['--force', '--deep', '--sign', '-', targetApp]);
+          } catch (_e) {
+            // ignore
+          }
+        }
+      } finally {
+        try {
+          execFileSync('hdiutil', ['detach', mountPoint, '-force']);
+        } catch (_e) {
+          // ignore
+        }
+        fs.rmSync(dmgPath, { force: true });
+      }
+
+      res.json({
+        ok: true,
+        platform: 'darwin',
+        installedVersion: release.latestVersion,
+        message: 'Mise à jour installée dans /Applications/Overlay Regie.app. Redémarrage...'
+      });
+
+      setTimeout(() => {
+        try {
+          spawn('open', ['-n', '-a', '/Applications/Overlay Regie.app'], {
+            detached: true,
+            stdio: 'ignore'
+          }).unref();
+        } catch (_e) {
+          // ignore
+        }
+        process.exit(0);
+      }, 900);
+      return;
+    }
+
+    if (process.platform === 'win32') {
+      const exeUrl = release.assets?.exe;
+      if (!exeUrl) {
+        return res.status(404).json({ ok: false, error: 'Aucun fichier .exe trouvé dans la release' });
+      }
+      const exePath = path.join(tmpDir, `Overlay-Regie-Setup-v${release.latestVersion}.exe`);
+      await downloadFileWithRedirects(exeUrl, exePath);
+
+      res.json({
+        ok: true,
+        platform: 'win32',
+        installedVersion: release.latestVersion,
+        message: 'Installeur téléchargé. Lancement de la mise à jour...'
+      });
+
+      setTimeout(() => {
+        try {
+          spawn(exePath, [], { detached: true, stdio: 'ignore' }).unref();
+        } catch (_e) {
+          // ignore
+        }
+        process.exit(0);
+      }, 900);
+      return;
+    }
+
+    return res.status(400).json({ ok: false, error: 'Plateforme non supportée pour l\'installation auto' });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.get('/api/streamdeck-plugin', (_req, res) => {

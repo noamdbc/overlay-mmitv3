@@ -1364,7 +1364,7 @@
   let leftCollapsed = localStorage.getItem('mmitv_left_collapsed') === '1';
   let rightCollapsed = localStorage.getItem('mmitv_right_collapsed') === '1';
   let updateOnStartup = localStorage.getItem('mmitv_update_startup') !== '0';
-  let appVersion = '1.1.0';
+  let appVersion = '1.1.1';
   let githubRepo = 'noamdbc/overlay-mmitv3';
   let hasAvailableUpdate = false;
   let hasStreamDeckMismatch = false;
@@ -1647,6 +1647,29 @@
     document.getElementById('updatePromptModal').classList.add('hidden');
   }
 
+  async function triggerAutoInstallUpdate(btnEl) {
+    const labelEl = btnEl?.querySelector('span') || btnEl;
+    const origText = labelEl ? labelEl.textContent : '';
+    if (btnEl) btnEl.disabled = true;
+    if (labelEl) labelEl.textContent = 'Téléchargement & installation en cours...';
+    showToast('Téléchargement de la mise à jour en cours...');
+
+    try {
+      const res = await fetch('/api/install-update', { method: 'POST' });
+      const data = await res.json();
+      if (data?.ok) {
+        showToast(data.message || 'Mise à jour installée ! Redémarrage...');
+        if (labelEl) labelEl.textContent = 'Installé ! Redémarrage en cours...';
+      } else {
+        showToast(data?.error || 'Échec de l\'installation automatique');
+        if (btnEl) btnEl.disabled = false;
+        if (labelEl) labelEl.textContent = origText;
+      }
+    } catch (_err) {
+      showToast('Redémarrage de l\'application...');
+    }
+  }
+
   async function checkUpdatesFromGitHub(isStartup = false) {
     const statusBox = document.getElementById('updateStatusBox');
     const statusText = document.getElementById('updateStatusText');
@@ -1679,15 +1702,17 @@
         statusBox.classList.add('has-update');
         statusText.textContent = `Nouvelle version v${info.latestVersion} disponible sur GitHub ! (Version installée : v${info.currentVersion})`;
 
-        const btns = [];
+        const btns = [
+          `<button type="button" id="btnSettingsAutoInstall" class="btn-broadcast btn-take"><i class="fa-solid fa-bolt"></i> <span>Installer automatiquement (v${escapeText(info.latestVersion)})</span></button>`
+        ];
         if (info.assets?.dmg) {
           btns.push(
-            `<a href="${escapeText(info.assets.dmg)}" target="_blank" rel="noopener" class="btn-broadcast btn-take"><i class="fa-brands fa-apple"></i> Télécharger macOS (.dmg)</a>`
+            `<a href="${escapeText(info.assets.dmg)}" target="_blank" rel="noopener" class="btn-sec"><i class="fa-brands fa-apple"></i> .dmg macOS</a>`
           );
         }
         if (info.assets?.exe) {
           btns.push(
-            `<a href="${escapeText(info.assets.exe)}" target="_blank" rel="noopener" class="btn-broadcast btn-take"><i class="fa-brands fa-windows"></i> Télécharger Windows (.exe)</a>`
+            `<a href="${escapeText(info.assets.exe)}" target="_blank" rel="noopener" class="btn-sec"><i class="fa-brands fa-windows"></i> .exe Windows</a>`
           );
         }
         if (info.assets?.streamdeck) {
@@ -1695,13 +1720,11 @@
             `<a href="${escapeText(info.assets.streamdeck)}" target="_blank" rel="noopener" class="btn-sec"><i class="fa-solid fa-puzzle-piece"></i> Plugin Stream Deck (v${escapeText(info.latestVersion)})</a>`
           );
         }
-        if (btns.length === 0 && info.releaseUrl) {
-          btns.push(
-            `<a href="${escapeText(info.releaseUrl)}" target="_blank" rel="noopener" class="btn-broadcast btn-take"><i class="fa-brands fa-github"></i> Ouvrir la Release v${escapeText(info.latestVersion)}</a>`
-          );
-        }
         dlLinks.innerHTML = btns.join('');
         dlLinks.classList.remove('hidden');
+        document.getElementById('btnSettingsAutoInstall')?.addEventListener('click', (e) => {
+          triggerAutoInstallUpdate(e.currentTarget);
+        });
 
         if (isStartup) {
           openUpdatePromptModal(info);
@@ -3341,6 +3364,9 @@
     }
 
     // Startup Update Prompt Modal
+    document.getElementById('btnUpdPromptAutoInstall')?.addEventListener('click', (e) => {
+      triggerAutoInstallUpdate(e.currentTarget);
+    });
     document.getElementById('btnUpdPromptLater')?.addEventListener('click', closeUpdatePromptModal);
     document.getElementById('updatePromptBackdrop')?.addEventListener('click', closeUpdatePromptModal);
 

@@ -17,7 +17,7 @@
         <div class="brand-mark">
           <span class="brand-dot"></span>
           <span class="brand-title">OVERLAY RÉGIE</span>
-          <span id="topVersionBadge" class="ver-badge">v1.1.0</span>
+          <span id="topVersionBadge" class="ver-badge">v1.1.1</span>
         </div>
 
         <div id="airBadge" class="air-badge is-idle">
@@ -1005,8 +1005,11 @@
       </p>
       <div id="updPromptNotes" class="upd-prompt-notes hidden"></div>
       <div class="unsaved-actions">
-        <a id="btnUpdPromptDownloadPrimary" href="#" target="_blank" rel="noopener" class="btn-broadcast btn-take">
-          <i class="fa-solid fa-download"></i> <span id="updPromptPrimaryLabel">Télécharger la mise à jour</span>
+        <button type="button" id="btnUpdPromptAutoInstall" class="btn-broadcast btn-take">
+          <i class="fa-solid fa-bolt"></i> <span id="updPromptAutoInstallLabel">Installer & Redémarrer automatiquement</span>
+        </button>
+        <a id="btnUpdPromptDownloadPrimary" href="#" target="_blank" rel="noopener" class="btn-sec">
+          <i class="fa-solid fa-download"></i> <span id="updPromptPrimaryLabel">Télécharger l'installeur manuellement</span>
         </a>
         <a id="btnUpdPromptDownloadSd" href="#" target="_blank" rel="noopener" class="btn-sec hidden">
           <i class="fa-solid fa-puzzle-piece"></i> Télécharger le plugin Stream Deck associé
