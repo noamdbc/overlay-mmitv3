@@ -290,7 +290,6 @@ function buildNativeAppMenu() {
               { type: 'separator' },
               {
                 label: 'Paramètres & Plugin Stream Deck…',
-                accelerator: 'CmdOrCtrl+,',
                 click: () => sendMenuAction('open-settings')
               },
               {
@@ -341,29 +340,24 @@ function buildNativeAppMenu() {
       submenu: [
         {
           label: 'Nouveau Synthé (Bas-Gauche)',
-          accelerator: 'CmdOrCtrl+N',
           click: () => sendMenuAction('new-synthe')
         },
         {
           label: 'Nouveau Titre (Bas-Centre)',
-          accelerator: 'CmdOrCtrl+Shift+N',
           click: () => sendMenuAction('new-titre')
         },
         { type: 'separator' },
         {
           label: 'Enregistrer l\'asset actif',
-          accelerator: 'CmdOrCtrl+S',
           click: () => sendMenuAction('save-asset')
         },
         {
           label: 'Dupliquer l\'asset actif',
-          accelerator: 'CmdOrCtrl+D',
           click: () => sendMenuAction('duplicate-asset')
         },
         { type: 'separator' },
         {
           label: 'Gestionnaire de Profils…',
-          accelerator: 'CmdOrCtrl+P',
           click: () => sendMenuAction('open-profiles')
         },
         {
@@ -379,7 +373,6 @@ function buildNativeAppMenu() {
           ? [
               {
                 label: 'Paramètres & Plugin Stream Deck…',
-                accelerator: 'CmdOrCtrl+,',
                 click: () => sendMenuAction('open-settings')
               },
               { type: 'separator' },
@@ -400,12 +393,10 @@ function buildNativeAppMenu() {
       submenu: [
         {
           label: 'Annuler',
-          accelerator: 'CmdOrCtrl+Z',
           click: () => sendMenuAction('undo')
         },
         {
           label: 'Rétablir',
-          accelerator: 'CmdOrCtrl+Shift+Z',
           click: () => sendMenuAction('redo')
         },
         { type: 'separator' },
@@ -420,19 +411,16 @@ function buildNativeAppMenu() {
       submenu: [
         {
           label: 'Envoyer à l\'antenne (TAKE)',
-          accelerator: 'Space',
           click: () => sendMenuAction('take-air')
         },
         {
           label: 'Sortir avec animation (SORTIR)',
-          accelerator: 'Escape',
           click: () => {
             if (serverModule) serverModule.triggerOut();
           }
         },
         {
           label: 'Couper immédiatement (CUT)',
-          accelerator: 'Shift+Escape',
           click: () => {
             if (serverModule) serverModule.triggerCut();
           }
@@ -463,12 +451,10 @@ function buildNativeAppMenu() {
       submenu: [
         {
           label: 'Afficher / Replier le volet Assets (Gauche)',
-          accelerator: 'CmdOrCtrl+1',
           click: () => sendMenuAction('toggle-left-panel')
         },
         {
           label: 'Afficher / Replier le volet Inspecteur (Droite)',
-          accelerator: 'CmdOrCtrl+2',
           click: () => sendMenuAction('toggle-right-panel')
         },
         {
@@ -477,12 +463,10 @@ function buildNativeAppMenu() {
         },
         {
           label: 'Aperçu Plein Écran & Timeline Animation…',
-          accelerator: 'CmdOrCtrl+Shift+F',
           click: () => sendMenuAction('open-fs-preview')
         },
         {
           label: 'Galerie de Templates & Thèmes (36+)',
-          accelerator: 'CmdOrCtrl+G',
           click: () => sendMenuAction('open-gallery')
         },
         { type: 'separator' },

@@ -102,7 +102,7 @@
             <i class="fa-solid fa-list-check"></i> <span>Conducteur</span>
             <span id="rundownTotalCountBadge" class="left-mode-count">0</span>
           </button>
-          <button type="button" id="btnCollapseLeft" class="btn-fold-panel" title="Replier le volet (Cmd/Ctrl+1)">
+          <button type="button" id="btnCollapseLeft" class="btn-fold-panel" title="Replier le volet">
             <i class="fa-solid fa-angles-left"></i>
           </button>
         </div>
@@ -147,7 +147,7 @@
         <!-- VIEW 2: CONDUCTEUR D'ÉMISSION (RUNDOWN / NEXT CUE) -->
         <div id="viewRundown" class="left-view-panel hidden">
           <div class="rundown-master-bar">
-            <button type="button" id="btnRundownNext" class="btn-broadcast btn-rundown-master" title="Envoyer le cue suivant (Raccourci : Espace / Stream Deck)">
+            <button type="button" id="btnRundownNext" class="btn-broadcast btn-rundown-master" title="Envoyer le cue suivant (Stream Deck)">
               <div class="btn-rnd-icon">
                 <i id="icoRundownMaster" class="fa-solid fa-forward-step"></i>
               </div>
@@ -246,7 +246,7 @@
         <!-- MASTER ACTION / BROADCAST CONTROL BAR -->
         <div class="transport-bar">
           <div class="transport-main">
-            <button id="btnTake" class="btn-broadcast btn-take" title="Envoyer l'asset édité à l'antenne (Espace / Entrée)">
+            <button id="btnTake" class="btn-broadcast btn-take" title="Envoyer l'asset édité à l'antenne">
               <i class="fa-solid fa-play"></i>
               <span>ENVOYER EN DIRECT</span>
             </button>
@@ -260,12 +260,12 @@
               </button>
             </div>
 
-            <button id="btnOut" class="btn-broadcast btn-out" title="Animation de sortie (Échap)">
+            <button id="btnOut" class="btn-broadcast btn-out" title="Animation de sortie">
               <i class="fa-solid fa-arrow-down-long"></i>
               <span>SORTIR</span>
             </button>
 
-            <button id="btnCut" class="btn-broadcast btn-cut" title="Coupure immédiate sans animation (Shift+Échap)">
+            <button id="btnCut" class="btn-broadcast btn-cut" title="Coupure immédiate sans animation">
               <i class="fa-solid fa-bolt-lightning"></i>
               <span>CUT</span>
             </button>
@@ -273,10 +273,10 @@
 
           <div class="transport-save">
             <div class="undo-redo-group">
-              <button type="button" id="btnUndo" class="btn-sec btn-icon-sq" title="Annuler la dernière action (Cmd/Ctrl+Z)" disabled>
+              <button type="button" id="btnUndo" class="btn-sec btn-icon-sq" title="Annuler la dernière action" disabled>
                 <i class="fa-solid fa-rotate-left"></i>
               </button>
-              <button type="button" id="btnRedo" class="btn-sec btn-icon-sq" title="Rétablir l'action annulée (Cmd+Shift+Z / Ctrl+Y)" disabled>
+              <button type="button" id="btnRedo" class="btn-sec btn-icon-sq" title="Rétablir l'action annulée" disabled>
                 <i class="fa-solid fa-rotate-right"></i>
               </button>
             </div>
@@ -290,13 +290,13 @@
             <button id="btnRevert" class="btn-sec hidden" title="Réinitialiser les modifications non enregistrées">
               <i class="fa-solid fa-arrow-rotate-left"></i> Réinitialiser
             </button>
-            <button id="btnDuplicate" class="btn-sec" title="Dupliquer cet asset (Ctrl+D)">
+            <button id="btnDuplicate" class="btn-sec" title="Dupliquer cet asset">
               <i class="fa-regular fa-clone"></i> Dupliquer
             </button>
             <button id="btnExportMov" class="btn-sec btn-export-mov" title="Exporter l'animation en vidéo QuickTime avec canal Alpha (.mov)">
               <i class="fa-solid fa-file-video"></i> Exporter .MOV Alpha
             </button>
-            <button id="btnSave" class="btn-sec btn-save" title="Enregistrer dans la liste (Ctrl+S)">
+            <button id="btnSave" class="btn-sec btn-save" title="Enregistrer dans la liste">
               <i class="fa-solid fa-floppy-disk"></i> <span id="saveBtnLabel">Enregistrer</span>
             </button>
           </div>
@@ -321,7 +321,7 @@
                 <i class="fa-solid fa-font"></i> Typo & Motion
               </button>
             </div>
-            <button type="button" id="btnCollapseRight" class="btn-fold-panel" title="Replier le volet Inspecteur (Cmd/Ctrl+2)">
+            <button type="button" id="btnCollapseRight" class="btn-fold-panel" title="Replier le volet Inspecteur">
               <i class="fa-solid fa-angles-right"></i>
             </button>
           </div>
@@ -928,7 +928,7 @@
       <h3 class="unsaved-title">Supprimer cet asset ?</h3>
       <p class="unsaved-desc">
         Voulez-vous vraiment supprimer l'asset <strong id="deleteAssetName">Sans titre</strong> de ce profil ?<br>
-        <span class="delete-undo-hint">Astuce : vous pourrez annuler cette suppression avec <kbd>Ctrl+Z</kbd> / <kbd>Cmd+Z</kbd>.</span>
+        <span class="delete-undo-hint">Astuce : vous pourrez annuler cette suppression avec le bouton Annuler dans la barre d'outils.</span>
       </p>
       <div class="unsaved-actions">
         <button type="button" id="btnConfirmDeleteAsset" class="btn-broadcast btn-cut">
@@ -1130,7 +1130,7 @@
         <button type="button" id="btnFsTakeAir" class="btn-broadcast btn-take" title="Envoyer cet asset directement à l'antenne">
           <i class="fa-solid fa-play"></i> <span>ENVOYER EN DIRECT</span>
         </button>
-        <button type="button" id="btnCloseFsPreview" class="btn-sec btn-close-fs" title="Quitter le plein écran (Échap)">
+        <button type="button" id="btnCloseFsPreview" class="btn-sec btn-close-fs" title="Quitter le plein écran">
           <i class="fa-solid fa-compress"></i> <span>Quitter le plein écran</span>
         </button>
       </div>
@@ -1153,14 +1153,14 @@
         <button type="button" id="btnFsRestart" class="btn-sec btn-icon-sq" title="Retour au début (0.00s)">
           <i class="fa-solid fa-backward-step"></i>
         </button>
-        <button type="button" id="btnFsStepBack" class="btn-sec btn-icon-sq" title="Reculer d'une image (-1 frame / Flèche Gauche)">
+        <button type="button" id="btnFsStepBack" class="btn-sec btn-icon-sq" title="Reculer d'une image (-1 frame)">
           <i class="fa-solid fa-chevron-left"></i>
         </button>
-        <button type="button" id="btnFsPlayPause" class="btn-broadcast btn-take btn-fs-play" title="Lecture / Pause de la timeline (Espace)">
+        <button type="button" id="btnFsPlayPause" class="btn-broadcast btn-take btn-fs-play" title="Lecture / Pause de la timeline">
           <i id="icoFsPlayPause" class="fa-solid fa-pause"></i>
           <span id="lblFsPlayPause">PAUSE</span>
         </button>
-        <button type="button" id="btnFsStepFwd" class="btn-sec btn-icon-sq" title="Avancer d'une image (+1 frame / Flèche Droite)">
+        <button type="button" id="btnFsStepFwd" class="btn-sec btn-icon-sq" title="Avancer d'une image (+1 frame)">
           <i class="fa-solid fa-chevron-right"></i>
         </button>
       </div>
